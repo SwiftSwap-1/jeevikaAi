@@ -204,13 +204,13 @@ export const HelpFAQView: React.FC<HelpFAQViewProps> = ({
           {/* Hero Banner for Team Knight Coders */}
           <div className="bg-[#17365D] text-white rounded-2xl p-6 sm:p-8 relative overflow-hidden">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#D9822B] text-white text-xs font-bold mb-4 shadow-xs">
-              <span>Team Knight Coders · DEV2HACK Hackathon Initiative</span>
+              <span>Team Knight Coders · Livelihood Discovery Initiative</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               Bridging India's Digital Divide Through Voice-First AI
             </h2>
             <p className="mt-3 text-sm text-[#C9DAEC] max-w-2xl leading-relaxed">
-              JeevikaAI was conceptualized and developed by <strong>Team Knight Coders</strong> as an innovation project for the <strong>DEV2HACK Hackathon</strong>. Our mission is to make NSQF-aligned vocational discovery and employment pathways accessible to millions of first-time digital users through conversational voice in Hindi, Bhojpuri, and English.
+              JeevikaAI was conceptualized and developed by <strong>Team Knight Coders</strong> as an open civic innovation project. Our mission is to make NSQF-aligned vocational discovery and employment pathways accessible to millions of first-time digital users through conversational voice in Hindi, Bhojpuri, and English.
             </p>
           </div>
 
@@ -240,7 +240,7 @@ export const HelpFAQView: React.FC<HelpFAQViewProps> = ({
           {/* Core Architecture & Innovation Pillars */}
           <div className="space-y-4">
             <h3 className="text-base font-bold text-[#17365D]">
-              Key Architectural Innovations Built for DEV2HACK
+              Key Architectural Innovations Built for JeevikaAI
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div className="border border-[#DCE3EA] rounded-xl p-4 space-y-2 bg-white">
@@ -282,7 +282,7 @@ export const HelpFAQView: React.FC<HelpFAQViewProps> = ({
                 Built with dedication by Team Knight Coders
               </h4>
               <p className="text-xs text-[#5F6B76] mt-0.5">
-                DEV2HACK Hackathon Initiative · Open civic technology for empowerment and livelihood discovery.
+                Open civic technology for empowerment and livelihood discovery.
               </p>
             </div>
             <button
