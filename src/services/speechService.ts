@@ -1,5 +1,6 @@
 import { SupportedLanguage, BeneficiaryProfile, StepOption } from '../types';
 import { EDU, WORK, MOB } from '../data/mockData';
+import { voiceVocabularyCache } from './voiceVocabularyCache';
 
 export interface SpeechRecognitionResultWrapper {
   transcript: string;
@@ -28,11 +29,46 @@ class SpeechService {
   private activeSessionId: number = 0;
   private activeSpeakId: number = 0;
   private audioCtx: AudioContext | null = null;
+  private isOfflineMode: boolean = typeof navigator !== 'undefined' ? !navigator.onLine : false;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('offline', () => {
+        this.isOfflineMode = true;
+      });
+      window.addEventListener('online', () => {
+        this.isOfflineMode = false;
+      });
+    }
+  }
 
   public isSpeechRecognitionSupported(): boolean {
     return typeof window !== 'undefined' && Boolean(
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     );
+  }
+
+  public isOffline(): boolean {
+    if (typeof navigator !== 'undefined') {
+      return !navigator.onLine || this.isOfflineMode;
+    }
+    return this.isOfflineMode;
+  }
+
+  public setOfflineMode(enabled: boolean): void {
+    this.isOfflineMode = enabled;
+  }
+
+  public getCachedVocabulary() {
+    return voiceVocabularyCache.getAll();
+  }
+
+  public getVocabCategories() {
+    return voiceVocabularyCache.getCategories();
+  }
+
+  public matchCachedCommand(query: string) {
+    return voiceVocabularyCache.findBestMatch(query);
   }
 
   public isSpeechSynthesisSupported(): boolean {
@@ -149,9 +185,25 @@ class SpeechService {
     this.recognition.continuous = !isMobile;
     this.recognition.maxAlternatives = 1;
 
+    // Pre-load Web Speech API SpeechGrammarList with cached vocabulary
+    const SpeechGrammarListClass = (window as any).SpeechGrammarList || (window as any).webkitSpeechGrammarList;
+    if (SpeechGrammarListClass) {
+      try {
+        const grammarList = new SpeechGrammarListClass();
+        const jsgf = voiceVocabularyCache.generateJSGFGrammar(lang);
+        grammarList.addFromString(jsgf, 1);
+        this.recognition.grammars = grammarList;
+      } catch {
+        // Safe fallback if JSGF grammar is not supported by device engine
+      }
+    }
+
+    let lastKnownTranscript = '';
+
     this.recognition.onstart = () => {
       if (sessionId !== this.activeSessionId) return;
       this.isListening = true;
+      lastKnownTranscript = '';
       if (!isMobile) {
         this.playAudioCue('listen_start');
       }
@@ -180,6 +232,11 @@ class SpeechService {
       const isFinal = Boolean(event.results[event.results.length - 1]?.isFinal);
 
       if (text) {
+        lastKnownTranscript = text;
+        // Dynamically add recognized phrase to local cache
+        if (isFinal) {
+          voiceVocabularyCache.addPhrase(text, 'navigation', lang);
+        }
         onResult({ transcript: text, isFinal });
       }
     };
@@ -197,7 +254,19 @@ class SpeechService {
       } else if (code === 'audio-capture') {
         msg = 'No microphone found on this device. Please use keyboard input.';
       } else if (code === 'network') {
-        msg = 'Speech recognition network service is busy. Please try again or type.';
+        this.isOfflineMode = true;
+        // If user was speaking and network dropped, salvage using cached voice vocabulary
+        if (lastKnownTranscript) {
+          const salvaged = voiceVocabularyCache.findBestMatch(lastKnownTranscript);
+          if (salvaged && salvaged.score >= 0.35) {
+            this.isListening = false;
+            onResult({ transcript: salvaged.item.phrase, isFinal: true });
+            return;
+          }
+        }
+        msg = (lang === 'en')
+          ? 'Network connection lost. Offline Voice Vocabulary Cache active.'
+          : 'इंटरनेट कनेक्शन नहीं है। ऑफ़लाइन वॉइस कैश सक्रिय है।';
       }
 
       if (code !== 'no-speech' && code !== 'aborted') {
@@ -455,6 +524,18 @@ class SpeechService {
         maxScore = 5;
       }
 
+      // Check offline cached vocabulary for education if score is low
+      if (!matchedOpt) {
+        const cachedMatch = voiceVocabularyCache.findBestMatch(raw);
+        if (cachedMatch && cachedMatch.item.category === 'education') {
+          matchedOpt = EDU.find(e =>
+            e.v.toLowerCase().includes(cachedMatch.item.phrase.toLowerCase()) ||
+            cachedMatch.item.synonyms.some(s => e.v.toLowerCase().includes(s.toLowerCase())) ||
+            e.kw.some(k => cachedMatch.item.phrase.toLowerCase().includes(k.toLowerCase()))
+          ) || null;
+        }
+      }
+
       if (matchedOpt) {
         const ack = lang === 'bho'
           ? `अच्छा, ${matchedOpt.bho || matchedOpt.hi}। नोट हो गइल।`
@@ -500,9 +581,10 @@ class SpeechService {
     // 4. Work Type extraction (Job / Self / Either)
     if (stepKey === 'workType') {
       let matched = WORK[0].v;
-      if (lower.includes('self') || lower.includes('business') || lower.includes('dukan') || lower.includes('apna') || lower.includes('दुकान') || lower.includes('स्वरोजगार') || lower.includes('खुद')) {
+      const cachedMatch = voiceVocabularyCache.findBestMatch(raw);
+      if (lower.includes('self') || lower.includes('business') || lower.includes('dukan') || lower.includes('apna') || lower.includes('दुकान') || lower.includes('स्वरोजगार') || lower.includes('खुद') || (cachedMatch?.item.phrase.includes('स्वरोजगार'))) {
         matched = 'Self-employment';
-      } else if (lower.includes('dono') || lower.includes('any') || lower.includes('either') || lower.includes('kuch bhi') || lower.includes('कोई भी') || lower.includes('दोनों')) {
+      } else if (lower.includes('dono') || lower.includes('any') || lower.includes('either') || lower.includes('kuch bhi') || lower.includes('कोई भी') || lower.includes('दोनों') || (cachedMatch?.item.phrase.includes('कोई भी'))) {
         matched = 'Either';
       } else {
         matched = 'Job';
@@ -524,9 +606,10 @@ class SpeechService {
     // 5. Mobility extraction
     if (stepKey === 'mobility') {
       let matched = MOB[0].v;
-      if (lower.includes('anywhere') || lower.includes('state') || lower.includes('door') || lower.includes('बाहर') || lower.includes('कहीं भी')) {
+      const cachedMatch = voiceVocabularyCache.findBestMatch(raw);
+      if (lower.includes('anywhere') || lower.includes('state') || lower.includes('door') || lower.includes('बाहर') || lower.includes('कहीं भी') || (cachedMatch?.item.phrase.includes('राज्य'))) {
         matched = MOB[2].v;
-      } else if (lower.includes('district') || lower.includes('zila') || lower.includes('shahar') || lower.includes('जिला') || lower.includes('शहर')) {
+      } else if (lower.includes('district') || lower.includes('zila') || lower.includes('shahar') || lower.includes('जिला') || lower.includes('शहर') || (cachedMatch?.item.phrase.includes('जिले'))) {
         matched = MOB[1].v;
       } else {
         matched = MOB[0].v;

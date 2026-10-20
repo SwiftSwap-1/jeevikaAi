@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LogoMark } from './Logo';
 import { Icon } from './Icons';
 import { SupportedLanguage, AppView, BeneficiaryProfile } from '../types';
 import { speechService, SpeechRecognitionResultWrapper } from '../services/speechService';
 import { processLocalAssistantQuery } from '../services/aiAssistantEngine';
+import { voiceVocabularyCache, CachedVocabularyItem } from '../services/voiceVocabularyCache';
 
 interface FloatingVoiceAssistantProps {
   currentView: AppView;
@@ -26,6 +27,19 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
   const [isListening, setIsListening] = useState<boolean>(false);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [liveTranscript, setLiveTranscript] = useState<string>('');
+  const [isOffline, setIsOffline] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? !navigator.onLine : false;
+  });
+  const [simulatedOffline, setSimulatedOffline] = useState<boolean>(false);
+  const [showVocabModal, setShowVocabModal] = useState<boolean>(false);
+  const [vocabSearch, setVocabSearch] = useState<string>('');
+  const [vocabCategory, setVocabCategory] = useState<string>('all');
+  const [cachedVocabList, setCachedVocabList] = useState<CachedVocabularyItem[]>(() =>
+    voiceVocabularyCache.getAll()
+  );
+
+  const effectiveOffline = isOffline || simulatedOffline;
+
   const [aiMessage, setAiMessage] = useState<string>(
     'नमस्ते! मैं आपकी क्या सहायता कर सकता हूँ? बोलिए, मैं सुन रहा हूँ।'
   );
@@ -74,6 +88,46 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
   });
 
   const buttonContainerRef = useRef<HTMLDivElement>(null);
+
+  // Track network online/offline state
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      setActionNotice(currentLang === 'en' ? '🌐 Back Online' : '🌐 इंटरनेट कनेक्ट हो गया है');
+      setTimeout(() => setActionNotice(null), 3000);
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      setActionNotice(currentLang === 'en' ? '🌐 Offline Voice Cache Active' : '🌐 ऑफ़लाइन वॉइस कैश सक्रिय है');
+      setTimeout(() => setActionNotice(null), 4000);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [currentLang]);
+
+  // Sync speechService offline state whenever effectiveOffline changes
+  useEffect(() => {
+    speechService.setOfflineMode(effectiveOffline);
+  }, [effectiveOffline]);
+
+  // Filtered vocabulary list for offline browser modal
+  const filteredVocab = useMemo(() => {
+    return cachedVocabList.filter((item) => {
+      const matchesCategory = vocabCategory === 'all' || item.category === vocabCategory;
+      if (!matchesCategory) return false;
+      if (!vocabSearch.trim()) return true;
+      const q = vocabSearch.toLowerCase().trim();
+      return (
+        item.phrase.toLowerCase().includes(q) ||
+        item.synonyms.some((s) => s.toLowerCase().includes(q))
+      );
+    });
+  }, [cachedVocabList, vocabCategory, vocabSearch]);
 
   // Re-clamp position on window resize
   useEffect(() => {
@@ -208,10 +262,19 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
           processUserQuery(result.transcript.trim());
         }
       },
-      (errorMsg: string) => {
+      (errorMsg: string, code?: string) => {
         setIsListening(false);
         setIsSpeaking(false);
-        setAiMessage(`माफ़ कीजिए: ${errorMsg}`);
+        if (code === 'network' || !navigator.onLine || effectiveOffline) {
+          setIsOffline(true);
+          const offlineNotice = currentLang === 'en'
+            ? '🌐 Network connection lost. Offline Voice Vocabulary Cache is active.'
+            : '🌐 इंटरनेट कनेक्शन नहीं है। ऑफ़लाइन वॉइस डिक्शनरी कैश सक्रिय है।';
+          setAiMessage(offlineNotice);
+          speechService.speak(offlineNotice, currentLang);
+        } else {
+          setAiMessage(`माफ़ कीजिए: ${errorMsg}`);
+        }
       },
       () => {
         setIsListening(false);
@@ -226,11 +289,15 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
       await speechService.requestMicrophonePermission();
 
       // Auto-greet aloud and immediately start listening for seamless voice interaction
-      const greeting = currentLang === 'bho'
-        ? 'नमस्ते! हम जीविका एआई बानी। रउआ रोडमैप, नौकरी या हुनर कार्ड पढ़े खातिर कह सकेनी, या पेज खोल सकेनी।'
-        : currentLang === 'en'
-        ? 'Hello! I am JeevikaAI. You can ask me to read your Roadmap Card, Job Cards, or navigate pages. Speak now, I am listening!'
-        : 'नमस्ते! मैं जीविका एआई हूँ। आप मुझसे "रोडमैप कार्ड पढ़ो", "नौकरी कार्ड बताओ", या "पेज खोलो" कह सकते हैं। बोलिए, मैं सुन रहा हूँ!';
+      const greeting = effectiveOffline
+        ? (currentLang === 'en'
+            ? 'Hello! Offline Voice Cache is active. You can speak or tap any cached command.'
+            : 'नमस्ते! ऑफ़लाइन वॉइस कैश सक्रिय है। बोलिए, मैं सुन रहा हूँ!')
+        : (currentLang === 'bho'
+            ? 'नमस्ते! हम जीविका एआई बानी। रउआ रोडमैप, नौकरी या हुनर कार्ड पढ़े खातिर कह सकेनी, या पेज खोल सकेनी।'
+            : currentLang === 'en'
+            ? 'Hello! I am JeevikaAI. You can ask me to read your Roadmap Card, Job Cards, or navigate pages. Speak now, I am listening!'
+            : 'नमस्ते! मैं जीविका एआई हूँ। आप मुझसे "रोडमैप कार्ड पढ़ो", "नौकरी कार्ड बताओ", या "पेज खोलो" कह सकते हैं। बोलिए, मैं सुन रहा हूँ!');
 
       setAiMessage(greeting);
 
@@ -261,8 +328,15 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     setChatHistory((prev) => [...prev, { sender: 'user', text: queryText }]);
     setLiveTranscript('');
 
+    // Normalize with cached vocabulary if best match found
+    let normalizedQuery = queryText;
+    const cachedMatch = voiceVocabularyCache.findBestMatch(queryText);
+    if (cachedMatch && cachedMatch.score >= 0.75) {
+      normalizedQuery = cachedMatch.item.phrase;
+    }
+
     // Pre-evaluate with local Indic & English engine
-    const localResult = processLocalAssistantQuery(queryText, currentView, currentLang, profile);
+    const localResult = processLocalAssistantQuery(normalizedQuery, currentView, currentLang, profile);
 
     let finalReply = localResult.reply;
     let spokenText = localResult.spokenReply;
@@ -271,9 +345,13 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     let profileUpdates = localResult.profileUpdates;
     let isCardRead = localResult.isCardReadout;
 
+    // Dynamically learn & persist the spoken phrase in local cache for future offline voice matching
+    voiceVocabularyCache.addPhrase(queryText, 'navigation', currentLang);
+    setCachedVocabList(voiceVocabularyCache.getAll());
+
     // If query is an explicit card reading or direct navigation, localResult is immediate and 100% authoritative.
-    // If it is a general question, attempt server backend proxy with a safe 3.5s timeout:
-    if (!localResult.isCardReadout && !localResult.targetView) {
+    // If it is a general question and online, attempt server backend proxy with a safe 3.5s timeout:
+    if (!localResult.isCardReadout && !localResult.targetView && !effectiveOffline && (typeof navigator === 'undefined' || navigator.onLine)) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500);
@@ -282,7 +360,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: queryText,
+            message: normalizedQuery,
             language: currentLang,
             currentView,
             userProfile: profile || {}
@@ -435,6 +513,14 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
 
             <div className="flex items-center gap-1.5">
               <button
+                onClick={() => setShowVocabModal(true)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center gap-1 transition-colors"
+                title="लोकल वॉइस-टू-टेक्स्ट डिक्शनरी (Local Speech Vocabulary Cache)"
+              >
+                <Icon name="layers" size={13} />
+                <span className="hidden xs:inline">वॉइस कैश ({cachedVocabList.length})</span>
+              </button>
+              <button
                 onClick={() => setShowApiModal(true)}
                 className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center gap-1 transition-colors"
                 title="Cloudflare Worker & API Key Setup"
@@ -488,6 +574,36 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
             )}
           </div>
 
+          {/* Offline Status & Cached Voice-to-Text Vocabulary Indicator */}
+          {effectiveOffline && (
+            <div className="p-2.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between text-[11px] text-amber-900 font-semibold animate-fade-in">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span>
+                  🌐 {simulatedOffline ? 'सिम्युलेटेड ऑफ़लाइन' : 'इंटरनेट डिस्कनेक्टेड'}: {cachedVocabList.length} वॉइस कमांड्स कैश
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowVocabModal(true)}
+                  className="text-[10px] px-2 py-0.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-950 font-bold transition-colors shadow-2xs"
+                  title="ऑफ़लाइन वॉइस डिक्शनरी खोलें"
+                >
+                  डिक्शनरी
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSimulatedOffline(!simulatedOffline)}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 transition-colors"
+                  title="Toggle offline test mode"
+                >
+                  {simulatedOffline ? 'ऑनलाइन' : 'टेस्ट'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Chat Messages Body */}
           <div className="flex-1 p-4 overflow-y-auto space-y-3.5 text-xs">
             {chatHistory.map((msg, idx) => (
@@ -524,7 +640,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
 
           {/* Voice Record & Keyboard Input Footer */}
           <div className="p-3 bg-white border-t border-[#DCE3EA] space-y-2">
-            {/* Quick Interactive Card Reading & Navigation Chips */}
+            {/* Quick Interactive Card Reading & Cached Vocabulary Chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-semibold no-scrollbar">
               <button
                 type="button"
@@ -570,6 +686,15 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
               >
                 <span>🏛️</span>
                 <span>{currentLang === 'en' ? 'Schemes' : 'योजना कार्ड'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => processUserQuery(currentLang === 'en' ? 'Open Profile' : 'मेरी प्रोफ़ाइल खोलो')}
+                className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 hover:bg-sky-100 whitespace-nowrap border border-sky-200 flex items-center gap-1 transition-colors"
+                title="प्रोफाइल खोलें"
+              >
+                <span>👤</span>
+                <span>{currentLang === 'en' ? 'Profile' : 'प्रोफ़ाइल'}</span>
               </button>
             </div>
 
@@ -684,6 +809,208 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 className="px-4 py-2 rounded-xl bg-[#17365D] text-white font-bold text-xs hover:bg-[#245A91]"
               >
                 समझ गया (Close)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offline Voice-to-Text Vocabulary Cache Modal */}
+      {showVocabModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col border border-[#DCE3EA] text-xs animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#DCE3EA]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-800 flex items-center justify-center text-base">
+                  📂
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#17365D] leading-tight">
+                    ऑफ़लाइन वॉइस-टू-टेक्स्ट डिक्शनरी (Voice Vocabulary Cache)
+                  </h3>
+                  <p className="text-[11px] text-[#5F6B76]">
+                    लोकल Web Speech API व JSGF कैश — इंटरनेट न होने पर भी 100% काम करता है
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowVocabModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-[#5F6B76] transition-colors"
+              >
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+
+            {/* Offline Status & Test Banner */}
+            <div className={`p-3 rounded-2xl border flex items-center justify-between text-xs ${
+              effectiveOffline
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${effectiveOffline ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                <div>
+                  <span className="font-bold">
+                    {effectiveOffline ? 'ऑफ़लाइन मोड सक्रिय (Offline Mode Active)' : 'इंटरनेट कनेक्टेड (Online Mode)'}
+                  </span>
+                  <span className="block text-[11px] opacity-80">
+                    {effectiveOffline
+                      ? 'नेटवर्क डिस्कनेक्ट होने पर भी स्पीच रिकग्निशन व कार्ड रीडिंग चालू है'
+                      : 'नेटवर्क व लोकल कैश दोनों उपलब्ध हैं'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSimulatedOffline(!simulatedOffline)}
+                className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all shadow-xs ${
+                  simulatedOffline
+                    ? 'bg-amber-600 text-white hover:bg-amber-700'
+                    : 'bg-white text-[#17365D] border border-[#DCE3EA] hover:bg-slate-50'
+                }`}
+              >
+                {simulatedOffline ? 'सिम्युलेशन बंद करें' : '🔌 ऑफ़लाइन टेस्ट करें'}
+              </button>
+            </div>
+
+            {/* Search Input & Reset button */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={vocabSearch}
+                  onChange={(e) => setVocabSearch(e.target.value)}
+                  placeholder="कमांड या हुनर खोजें (उदा. 'रोडमैप', 'नौकरी', 'सोलर', '10वीं')..."
+                  className="w-full pl-8 pr-7 py-2 rounded-xl border border-[#DCE3EA] text-xs focus:border-[#245A91] focus:outline-none"
+                />
+                <span className="absolute left-2.5 top-2 text-[#5F6B76]">🔍</span>
+                {vocabSearch && (
+                  <button
+                    onClick={() => setVocabSearch('')}
+                    className="absolute right-2.5 top-2 text-[#5F6B76] hover:text-[#17365D]"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  voiceVocabularyCache.resetToDefault();
+                  setCachedVocabList(voiceVocabularyCache.getAll());
+                  onNotify('वॉइस डिक्शनरी डिफ़ॉल्ट पर रीसेट हो गई');
+                }}
+                className="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#5F6B76] text-[11px] font-semibold transition-colors whitespace-nowrap"
+                title="Reset cache to seed vocabulary"
+              >
+                🔄 रीसेट
+              </button>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
+              <button
+                onClick={() => setVocabCategory('all')}
+                className={`px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-colors ${
+                  vocabCategory === 'all'
+                    ? 'bg-[#17365D] text-white'
+                    : 'bg-[#F5F7FA] text-[#5F6B76] hover:bg-slate-200'
+                }`}
+              >
+                सभी ({cachedVocabList.length})
+              </button>
+              {voiceVocabularyCache.getCategories().map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setVocabCategory(cat.id)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-colors flex items-center gap-1 ${
+                    vocabCategory === cat.id
+                      ? 'bg-[#245A91] text-white'
+                      : 'bg-[#F5F7FA] text-[#5F6B76] hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{cat.icon}</span>
+                  <span>{currentLang === 'en' ? cat.labelEn : cat.labelHi}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Vocabulary Items List */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-[45vh]">
+              {filteredVocab.length === 0 ? (
+                <div className="p-6 text-center text-[#5F6B76]">
+                  कोई वॉइस कमांड नहीं मिला। दूसरा शब्द खोजें।
+                </div>
+              ) : (
+                filteredVocab.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-2xl border border-[#DCE3EA] bg-[#FDFEFE] hover:border-[#245A91]/50 hover:bg-[#F5F7FA] transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-[#17365D]">
+                          "{item.phrase}"
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E3F1FA] text-[#245A91] font-bold">
+                          {item.category}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 text-[10px] text-[#5F6B76]">
+                        <span className="font-semibold">वैकल्पिक:</span>
+                        {item.synonyms.slice(0, 4).map((syn, sIdx) => (
+                          <span
+                            key={sIdx}
+                            className="bg-slate-100 px-1.5 py-0.5 rounded text-[#202B36]"
+                          >
+                            {syn}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          speechService.speak(item.phrase, currentLang);
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#17365D] font-bold text-[11px] flex items-center gap-1 transition-colors"
+                        title="सुनें कि इसे कैसे बोलना है"
+                      >
+                        <Icon name="volume2" size={13} />
+                        <span>सुनें</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowVocabModal(false);
+                          processUserQuery(item.phrase);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-[#245A91] hover:bg-[#17365D] text-white font-bold text-[11px] flex items-center gap-1 transition-colors shadow-xs"
+                        title="यह वॉइस कमांड तुरंत चलाएं"
+                      >
+                        <Icon name="mic" size={13} />
+                        <span>बोलकर चलाएं</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-[#DCE3EA] flex items-center justify-between text-[11px] text-[#5F6B76]">
+              <span className="flex items-center gap-1 font-medium">
+                💾 <span>कुल {cachedVocabList.length} वॉइस कमांड्स लोकल स्टोरेज में सुरक्षित</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowVocabModal(false)}
+                className="px-4 py-1.5 rounded-xl bg-[#17365D] text-white font-bold hover:bg-[#245A91] transition-colors"
+              >
+                बंद करें
               </button>
             </div>
           </div>

@@ -314,7 +314,7 @@ function buildSummary(profile, ranked, jobs, selId, shortlist) {
   L.push('SAMPLE LOCAL OPPORTUNITIES (illustrative)');
   jobs.forEach((j) => L.push('- ' + j.title + ' | ' + j.org + ' | ' + j.type + ' | ' + j.loc + ' | ' + kmLabel(j) + ' | ' + j.pay + (j.inRange ? '' : ' | Outside your nearby range') + (shortlist[j.id] ? ' | SHORTLISTED' : '')));
   L.push('');
-  L.push('Built by Team Knight Coders for the DEV2HACK hackathon. Not an official service.');
+  L.push('Built by Team Knight Coders. Prototype for vocational discovery.');
   return L.join('\n');
 }
 
@@ -388,11 +388,11 @@ function Footer({ go }) {
           </div>
           <div>
             <div className="team">Team Knight Coders</div>
-            <p style={{ marginTop: 6 }}>DEV2HACK hackathon prototype</p>
+            <p style={{ marginTop: 6 }}>Voice-first Livelihood Assistant</p>
           </div>
         </div>
         <p className="fine">
-          Disclaimer: JeevikaAI is a demo prototype built for the DEV2HACK hackathon. Profiles, skill recommendations, course details, NSQF levels and job listings are fictional or illustrative sample data. They are not verified live listings or official certifications, and nothing here is approved by or affiliated with any government body.
+          Disclaimer: JeevikaAI is a demo prototype. Profiles, skill recommendations, course details, NSQF levels and job listings are fictional or illustrative sample data. They are not verified live listings or official certifications, and nothing here is approved by or affiliated with any government body.
         </p>
       </div>
     </footer>

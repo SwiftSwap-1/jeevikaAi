@@ -1,6 +1,6 @@
 # JeevikaAI
 
-**Voice-Based Livelihood & Skill Assistant** · Team Knight Coders · DEV2HACK hackathon prototype
+**Voice-Based Livelihood & Skill Assistant** · Team Knight Coders · Prototype
 
 JeevikaAI helps people with low digital literacy discover skills, NSQF-aligned training pathways and nearby jobs or self-employment options, in Hindi, English or Hinglish.
 
