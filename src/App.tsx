@@ -21,10 +21,11 @@ import { SummaryModal } from './components/SummaryModal';
 import { VoiceStartModal } from './components/VoiceStartModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { FloatingVoiceAssistant } from './components/FloatingVoiceAssistant';
-import { BeneficiaryProfile, SupportedLanguage, AppView, Opportunity, SummaryModalData } from './types';
+import { BeneficiaryProfile, SupportedLanguage, AppView, Opportunity, SummaryModalData, LocationLivelihoodData } from './types';
 import { DEMO } from './data/mockData';
 import { storageService } from './services/storageService';
 import { authService, AppUser, firestoreService } from './services/firebase';
+import { locationIntelligenceService } from './services/locationIntelligenceService';
 
 export default function App() {
   const isStandalone = 
@@ -60,9 +61,25 @@ export default function App() {
   const [isAnalyzingProfile, setIsAnalyzingProfile] = useState<boolean>(false);
   const [analysisStep, setAnalysisStep] = useState<number>(1);
 
+  // Active Location & Live Location Intelligence State
+  const [activeLocation, setActiveLocation] = useState<string>(() => {
+    return storageService.loadProfile()?.location || locationIntelligenceService.getActiveLocation() || 'Maharajganj, Uttar Pradesh';
+  });
+  const [locationData, setLocationData] = useState<LocationLivelihoodData | null>(() => locationIntelligenceService.getCachedData());
+  const [isRefreshingLocationData, setIsRefreshingLocationData] = useState<boolean>(false);
+
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     return Boolean(isStandalone && !sessionStorage.getItem('jeevika_pwa_splashed'));
   });
+
+  // Subscribe to location intelligence changes & do initial fetch
+  useEffect(() => {
+    const unsub = locationIntelligenceService.subscribe((data) => {
+      setLocationData(data);
+    });
+    locationIntelligenceService.fetchLocationData(activeLocation, currentLang, profile);
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (showSplash) {
@@ -246,6 +263,51 @@ export default function App() {
     }
   };
 
+  const handleLocationChange = async (newLocation: string) => {
+    setActiveLocation(newLocation);
+    locationIntelligenceService.setActiveLocation(newLocation);
+    if (profile) {
+      const updated = { ...profile, location: newLocation };
+      setProfile(updated);
+      storageService.saveProfile(updated);
+    }
+    setIsRefreshingLocationData(true);
+    try {
+      const fresh = await locationIntelligenceService.fetchLocationData(newLocation, currentLang, profile);
+      setLocationData(fresh);
+      notify(
+        currentLang === 'bho'
+          ? `स्थान बदलल गइल: ${newLocation}`
+          : currentLang === 'en'
+          ? `Location updated to: ${newLocation}`
+          : `स्थान अपडेट हुआ: ${newLocation}`
+      );
+    } catch {
+      // Handled in service
+    } finally {
+      setIsRefreshingLocationData(false);
+    }
+  };
+
+  const handleRefreshLocationAi = async () => {
+    setIsRefreshingLocationData(true);
+    try {
+      const fresh = await locationIntelligenceService.fetchLocationData(activeLocation, currentLang, profile);
+      setLocationData(fresh);
+      notify(
+        currentLang === 'bho'
+          ? 'AI से लाइव डेटा अपडेट हो गइल!'
+          : currentLang === 'en'
+          ? 'Live location data refreshed via Gemini AI!'
+          : 'AI द्वारा लाइव लोकेशन डेटा सफलतापूर्वक लोड हुआ!'
+      );
+    } catch {
+      notify('Curated district data is active.');
+    } finally {
+      setIsRefreshingLocationData(false);
+    }
+  };
+
   const handleStartVoiceAssessment = (lang: SupportedLanguage) => {
     setCurrentLang(lang);
     setAutoStartAssessment(true);
@@ -355,6 +417,11 @@ export default function App() {
             onSelectDetail={setSelectedOpportunity}
             go={navigateTo}
             currentLang={currentLang}
+            locationData={locationData}
+            onLocationChange={handleLocationChange}
+            onRefreshAi={handleRefreshLocationAi}
+            isRefreshingAi={isRefreshingLocationData}
+            userProfile={activeProfile}
           />
         )}
 
@@ -365,6 +432,11 @@ export default function App() {
             onSelectDetail={setSelectedOpportunity}
             go={navigateTo}
             currentLang={currentLang}
+            locationData={locationData}
+            onLocationChange={handleLocationChange}
+            onRefreshAi={handleRefreshLocationAi}
+            isRefreshingAi={isRefreshingLocationData}
+            userProfile={activeProfile}
           />
         )}
 
@@ -471,6 +543,8 @@ export default function App() {
           go={navigateTo}
           onNotify={notify}
           onUpdateProfile={handleProfileUpdate}
+          activeLocation={activeLocation}
+          onLocationChange={handleLocationChange}
         />
       )}
 

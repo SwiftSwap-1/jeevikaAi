@@ -13,6 +13,8 @@ interface FloatingVoiceAssistantProps {
   go: (view: AppView, sectionId?: string) => void;
   onNotify: (msg: string) => void;
   onUpdateProfile?: (updated: BeneficiaryProfile) => void;
+  activeLocation?: string;
+  onLocationChange?: (newLoc: string) => void;
 }
 
 export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
@@ -22,10 +24,13 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
   go,
   onNotify,
   onUpdateProfile,
+  activeLocation,
+  onLocationChange,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [isOffline, setIsOffline] = useState<boolean>(() => {
     return typeof navigator !== 'undefined' ? !navigator.onLine : false;
@@ -349,12 +354,15 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     voiceVocabularyCache.addPhrase(queryText, 'navigation', currentLang);
     setCachedVocabList(voiceVocabularyCache.getAll());
 
-    // If query is an explicit card reading or direct navigation, localResult is immediate and 100% authoritative.
-    // If it is a general question and online, attempt server backend proxy with a safe 3.5s timeout:
-    if (!localResult.isCardReadout && !localResult.targetView && !effectiveOffline && (typeof navigator === 'undefined' || navigator.onLine)) {
+    // When online, leverage the deeply trained Gemini AI API backend proxy (/api/chat) for rich, contextual,
+    // location-aware, and natural conversation. If offline, the pre-computed localResult is instantaneous.
+    if (!effectiveOffline && (typeof navigator === 'undefined' || navigator.onLine)) {
+      setIsAiThinking(true);
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+        const targetLocation = activeLocation || profile?.location || 'Maharajganj, Uttar Pradesh';
 
         const response = await fetch('/api/chat', {
           method: 'POST',
@@ -363,7 +371,10 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
             message: normalizedQuery,
             language: currentLang,
             currentView,
-            userProfile: profile || {}
+            userProfile: {
+              ...(profile || {}),
+              location: targetLocation
+            }
           }),
           signal: controller.signal
         });
@@ -381,7 +392,9 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
         }
       } catch (err) {
         // Fallback is already pre-computed in localResult!
-        console.warn('AI assistant using robust local Indic engine:', err);
+        console.warn('AI assistant using resilient local Indic engine fallback:', err);
+      } finally {
+        setIsAiThinking(false);
       }
     }
 
@@ -403,10 +416,20 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
       setIsSpeaking(false);
     });
 
-    // Apply profile updates via voice if extracted
-    if (profileUpdates && profile && onUpdateProfile) {
-      const updatedProfile = { ...profile, ...profileUpdates };
-      onUpdateProfile(updatedProfile);
+    // Apply profile updates via voice if extracted (including location)
+    if (profileUpdates) {
+      if (profileUpdates.location && onLocationChange) {
+        onLocationChange(profileUpdates.location);
+        onNotify(
+          currentLang === 'en'
+            ? `Location updated to: ${profileUpdates.location}`
+            : `स्थान अपडेट हुआ: ${profileUpdates.location}`
+        );
+      }
+      if (profile && onUpdateProfile) {
+        const updatedProfile = { ...profile, ...profileUpdates };
+        onUpdateProfile(updatedProfile);
+      }
     }
 
     // Direct navigation & card pulse highlight
@@ -541,6 +564,28 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 <Icon name="x" size={16} />
               </button>
             </div>
+          </div>
+
+          {/* Active Location & AI Status Banner */}
+          <div className="px-3 py-1.5 bg-[#EBF3FB] border-b border-[#DCE3EA] flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-1.5 font-bold text-[#17365D]">
+              <span className="text-amber-600">📍</span>
+              <span className="truncate max-w-[200px]">
+                {activeLocation || profile?.location || 'Maharajganj, Uttar Pradesh'}
+              </span>
+            </div>
+
+            {isAiThinking ? (
+              <span className="flex items-center gap-1 text-[#245A91] font-bold animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#245A91]" />
+                <span>AI लाइव सोच रहा है...</span>
+              </span>
+            ) : (
+              <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>Gemini AI कनेक्टेड</span>
+              </span>
+            )}
           </div>
 
           {/* Voice Spectrum / Waveform Animation Indicator */}

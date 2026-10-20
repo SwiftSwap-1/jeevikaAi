@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Icon } from './Icons';
-import { Opportunity, SupportedLanguage } from '../types';
+import { Opportunity, SupportedLanguage, LocationLivelihoodData, BeneficiaryProfile } from '../types';
 import { JOBS } from '../data/mockData';
 import { t } from '../services/translationService';
+import { LocationBar } from './LocationBar';
 
 interface TrainingViewProps {
   onShortlistToggle: (id: string) => void;
@@ -10,6 +11,11 @@ interface TrainingViewProps {
   onSelectDetail: (opp: Opportunity) => void;
   go: (route: string) => void;
   currentLang: SupportedLanguage;
+  locationData?: LocationLivelihoodData | null;
+  onLocationChange?: (newLoc: string) => void;
+  onRefreshAi?: () => Promise<void>;
+  isRefreshingAi?: boolean;
+  userProfile?: BeneficiaryProfile | null;
 }
 
 export const TrainingView: React.FC<TrainingViewProps> = ({
@@ -18,9 +24,19 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
   onSelectDetail,
   go,
   currentLang,
+  locationData,
+  onLocationChange,
+  onRefreshAi,
+  isRefreshingAi = false,
+  userProfile,
 }) => {
   const [filterPathway, setFilterPathway] = useState<string>('all');
-  const trainingItems = JOBS.filter((j) => j.type === 'Training');
+
+  // Use localized training centers if available, or fall back to JOBS training items
+  const trainingItems: Opportunity[] =
+    locationData && locationData.trainingCenters && locationData.trainingCenters.length > 0
+      ? locationData.trainingCenters
+      : JOBS.filter((j) => j.type === 'Training');
 
   const filtered = trainingItems.filter(
     (t) => filterPathway === 'all' || t.path === filterPathway
@@ -51,6 +67,17 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
           {t('train.matchVoice', currentLang)}
         </button>
       </div>
+
+      {/* Location Bar with GPS and AI Live Sync */}
+      <LocationBar
+        currentLocation={locationData?.location || userProfile?.location || 'Maharajganj, Uttar Pradesh'}
+        onLocationChange={(newLoc) => onLocationChange && onLocationChange(newLoc)}
+        onRefreshAi={onRefreshAi || (async () => {})}
+        isRefreshing={isRefreshingAi}
+        isAiGenerated={Boolean(locationData?.isAiGenerated)}
+        insight={locationData?.insight}
+        currentLang={currentLang}
+      />
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 pb-6 overflow-x-auto text-xs font-bold">

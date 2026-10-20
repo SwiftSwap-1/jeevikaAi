@@ -173,3 +173,38 @@ export interface SummaryModalData {
   selectedPathway?: EvaluatedPathway | Pathway;
   jobs?: Opportunity[];
 }
+
+export interface GovernmentScheme {
+  id: string;
+  name: string;
+  hiName: string;
+  benefit: string;
+  eligibility: string;
+  applyOffice: string;
+  category: 'central' | 'state' | 'toolkit' | 'loan';
+  financialSupport: string;
+}
+
+export interface LocationInsight {
+  district: string;
+  state: string;
+  economicHub: string;
+  topSectors: string[];
+  averageMonthlyWage: string;
+  activeSchemesCount: number;
+  openVacanciesCount: number;
+  verifiedCentersCount: number;
+  summary: string;
+}
+
+export interface LocationLivelihoodData {
+  location: string;
+  district: string;
+  state: string;
+  isAiGenerated: boolean;
+  timestamp: string;
+  insight: LocationInsight;
+  opportunities: Opportunity[];
+  trainingCenters: Opportunity[];
+  schemes: GovernmentScheme[];
+}

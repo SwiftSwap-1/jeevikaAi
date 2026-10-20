@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Icon } from './Icons';
-import { Opportunity, SupportedLanguage } from '../types';
+import { Opportunity, SupportedLanguage, LocationLivelihoodData, BeneficiaryProfile } from '../types';
 import { JOBS } from '../data/mockData';
 import { t } from '../services/translationService';
+import { LocationBar } from './LocationBar';
 
 interface OpportunitiesViewProps {
   onShortlistToggle: (id: string) => void;
@@ -10,6 +11,11 @@ interface OpportunitiesViewProps {
   onSelectDetail: (opp: Opportunity) => void;
   go: (route: string) => void;
   currentLang: SupportedLanguage;
+  locationData?: LocationLivelihoodData | null;
+  onLocationChange?: (newLoc: string) => void;
+  onRefreshAi?: () => Promise<void>;
+  isRefreshingAi?: boolean;
+  userProfile?: BeneficiaryProfile | null;
 }
 
 export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
@@ -18,11 +24,22 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
   onSelectDetail,
   go,
   currentLang,
+  locationData,
+  onLocationChange,
+  onRefreshAi,
+  isRefreshingAi = false,
+  userProfile,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'nearby' | 'district' | 'self'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filtered = JOBS.filter((j) => {
+  // Use localized opportunities if available, or fall back to pre-seeded JOBS
+  const availableOpportunities: Opportunity[] =
+    locationData && locationData.opportunities && locationData.opportunities.length > 0
+      ? locationData.opportunities
+      : JOBS.filter((j) => j.type !== 'Training');
+
+  const filtered = availableOpportunities.filter((j) => {
     if (j.type === 'Training') return false; // Shown in Training section
     if (activeTab === 'nearby' && j.km > 10) return false;
     if (activeTab === 'district' && j.km > 40) return false;
@@ -64,6 +81,17 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
           {t('opp.calculateScore', currentLang)}
         </button>
       </div>
+
+      {/* Location Bar with GPS and AI Live Fetch */}
+      <LocationBar
+        currentLocation={locationData?.location || userProfile?.location || 'Maharajganj, Uttar Pradesh'}
+        onLocationChange={(newLoc) => onLocationChange && onLocationChange(newLoc)}
+        onRefreshAi={onRefreshAi || (async () => {})}
+        isRefreshing={isRefreshingAi}
+        isAiGenerated={Boolean(locationData?.isAiGenerated)}
+        insight={locationData?.insight}
+        currentLang={currentLang}
+      />
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6">
@@ -175,6 +203,55 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Active Government Schemes for this location */}
+      {locationData?.schemes && locationData.schemes.length > 0 && (
+        <section className="mt-12 pt-8 border-t border-[#DCE3EA] space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#17365D]/10 text-[#17365D] mb-1">
+                <span>🏛️</span>
+                <span>सरकारी योजनाएं व अनुदान (Government Support)</span>
+              </div>
+              <h2 className="text-2xl font-extrabold text-[#17365D]">
+                {locationData.district || 'जिले'} के लिए सक्रिय सरकारी योजनाएं
+              </h2>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {locationData.schemes.map((scheme) => (
+              <div
+                key={scheme.id}
+                className="bg-[#F8FAFC] border border-[#DCE3EA] rounded-2xl p-4 flex flex-col justify-between space-y-3"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded-md bg-[#245A91]/10 text-[#245A91] font-bold text-[10px] uppercase">
+                      {scheme.category}
+                    </span>
+                    <span className="text-[11px] font-bold text-amber-700">
+                      {scheme.financialSupport}
+                    </span>
+                  </div>
+
+                  <h3 className="font-bold text-sm text-[#17365D]">
+                    {scheme.hiName || scheme.name}
+                  </h3>
+                  <p className="text-xs text-[#5F6B76] leading-relaxed">
+                    {scheme.benefit}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-[#DCE3EA] text-[11px] text-[#5F6B76]">
+                  <span className="font-semibold text-[#17365D]">आवेदन स्थल: </span>
+                  <span>{scheme.applyOffice}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 };
