@@ -407,6 +407,11 @@ export default function App() {
             onNotify={notify}
             onOpenSummary={setSummaryModalData}
             onSelectDetail={setSelectedOpportunity}
+            onUpdateProfile={handleProfileUpdate}
+            onLocationChange={handleLocationChange}
+            locationData={locationData}
+            onRefreshLocationAi={handleRefreshLocationAi}
+            isRefreshingLocationData={isRefreshingLocationData}
           />
         )}
 

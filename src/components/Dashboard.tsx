@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Icon } from './Icons';
-import { BeneficiaryProfile, SupportedLanguage, Opportunity, AppView, SummaryModalData } from '../types';
+import { BeneficiaryProfile, SupportedLanguage, Opportunity, AppView, SummaryModalData, LocationLivelihoodData } from '../types';
 import { rankPaths, rankJobs, splitList, kmLabel, buildSummary, slug } from '../services/recommendationEngine';
 import { STAGE_TITLES } from '../data/mockData';
 import { speechService } from '../services/speechService';
 import { storageService } from '../services/storageService';
+import { locationIntelligenceService, POPULAR_INDIAN_REGIONS } from '../services/locationIntelligenceService';
 
 interface DashboardProps {
   profile: BeneficiaryProfile;
@@ -14,6 +15,11 @@ interface DashboardProps {
   onNotify: (msg: string) => void;
   onOpenSummary: (summaryData: SummaryModalData) => void;
   onSelectDetail: (opp: Opportunity) => void;
+  onUpdateProfile?: (updated: BeneficiaryProfile) => void;
+  onLocationChange?: (newLoc: string) => void;
+  locationData?: LocationLivelihoodData | null;
+  onRefreshLocationAi?: () => void;
+  isRefreshingLocationData?: boolean;
 }
 
 // Circular Fit Score Gauge using civic teal
@@ -57,6 +63,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNotify,
   onOpenSummary,
   onSelectDetail,
+  onUpdateProfile,
+  onLocationChange,
+  locationData,
+  onRefreshLocationAi,
+  isRefreshingLocationData = false,
 }) => {
   const rankedPaths = useMemo(() => rankPaths(profile), [profile]);
   const topPaths = rankedPaths.slice(0, 3);
@@ -70,8 +81,85 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isReadingRoadmap, setIsReadingRoadmap] = useState(false);
   const [showProfileDetails, setShowProfileDetails] = useState<boolean>(false);
 
+  // Location intelligence state
+  const [isDetectingLocation, setIsDetectingLocation] = useState<boolean>(false);
+  const [showDistrictSelector, setShowDistrictSelector] = useState<boolean>(false);
+  const [selectedStateIndex, setSelectedStateIndex] = useState<number>(0);
+
   const displayName = profile.name && profile.name.trim() ? profile.name.trim() : 'लाभार्थी (Beneficiary)';
   const displayInitial = displayName.charAt(0).toUpperCase();
+
+  const handleDetectLocation = async () => {
+    if (isDetectingLocation) return;
+    setIsDetectingLocation(true);
+    onNotify(
+      currentLang === 'bho'
+        ? 'जीपीएस से स्थान खोजल जा रहल बा... (Detecting Location)'
+        : currentLang === 'en'
+        ? 'Detecting your city/district via Geolocation API...'
+        : 'जीपीएस द्वारा आपके जिले/स्थान का पता लगाया जा रहा है...'
+    );
+
+    try {
+      const res = await locationIntelligenceService.detectGpsLocation();
+      if (res && res.location) {
+        const updated: BeneficiaryProfile = {
+          ...profile,
+          location: res.location
+        };
+        if (onUpdateProfile) {
+          onUpdateProfile(updated);
+        }
+        if (onLocationChange) {
+          onLocationChange(res.location);
+        }
+        onNotify(
+          currentLang === 'bho'
+            ? `स्थान मिल गइल: ${res.location}`
+            : currentLang === 'en'
+            ? `Location detected: ${res.location}`
+            : `स्थान सफलतापूर्वक प्राप्त हुआ: ${res.location}`
+        );
+      }
+    } catch (err: any) {
+      console.warn('Geolocation detection error:', err);
+      const isDenied = err?.code === 1 || err?.message?.toLowerCase().includes('denied');
+      onNotify(
+        isDenied
+          ? (currentLang === 'bho'
+              ? 'स्थान अनुमति अस्वीकृत बा। कृपया नीचे से जिला चुनीं।'
+              : 'स्थान अनुमति अस्वीकृत है। कृपया नीचे से जिला चुनें।')
+          : (currentLang === 'bho'
+              ? 'स्थान खोजे में समस्या आइल। कृपया सूची से चुनीं।'
+              : 'स्थान का पता नहीं चल सका। कृपया नीचे से जिला चुनें।')
+      );
+      setShowDistrictSelector(true);
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  };
+
+  const handleSelectDistrict = (districtName: string, stateName: string) => {
+    const newLoc = `${districtName}, ${stateName}`;
+    const updated: BeneficiaryProfile = {
+      ...profile,
+      location: newLoc
+    };
+    if (onUpdateProfile) {
+      onUpdateProfile(updated);
+    }
+    if (onLocationChange) {
+      onLocationChange(newLoc);
+    }
+    setShowDistrictSelector(false);
+    onNotify(
+      currentLang === 'bho'
+        ? `स्थान बदलल गइल: ${newLoc}`
+        : currentLang === 'en'
+        ? `Location set to: ${newLoc}`
+        : `स्थान सेट हुआ: ${newLoc}`
+    );
+  };
 
   const selectedPathway = rankedPaths.find((p) => p.id === selectedPathId) || topPaths[0] || rankedPaths[0];
   const completedCount = [0, 1, 2].filter((i) => doneStages[selectedPathway.id + i]).length;
@@ -268,10 +356,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Icon name="cap" size={14} className="text-[#38BDF8]" />
                 <span>शिक्षा: {profile.education || '10वीं पास'}</span>
               </span>
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
-                <Icon name="pin" size={14} className="text-[#38BDF8]" />
-                <span>स्थान: {profile.location || 'उत्तर प्रदेश'}</span>
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
+                  <Icon name="pin" size={14} className="text-[#38BDF8]" />
+                  <span>स्थान: {profile.location || 'उत्तर प्रदेश'}</span>
+                </span>
+                <button
+                  id="detect-my-location-hero-btn"
+                  onClick={handleDetectLocation}
+                  disabled={isDetectingLocation}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-white font-bold transition-all shadow-sm border border-[#38BDF8]/40 active:scale-95 disabled:opacity-75 cursor-pointer text-xs"
+                  title="Detect current city/district using GPS Geolocation API"
+                >
+                  <Icon
+                    name={isDetectingLocation ? 'refresh' : 'pin'}
+                    size={14}
+                    className={isDetectingLocation ? 'animate-spin text-[#38BDF8]' : 'text-[#38BDF8]'}
+                  />
+                  <span>
+                    {isDetectingLocation
+                      ? (currentLang === 'bho' ? 'स्थान खोज रहल बा...' : currentLang === 'en' ? 'Detecting GPS...' : 'स्थान खोज रहे हैं...')
+                      : '📍 Detect My Location'}
+                  </span>
+                </button>
+              </div>
               <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
                 <Icon name="store" size={14} className="text-[#38BDF8]" />
                 <span>काम की प्राथमिकता: {profile.workType || 'Self-employment'}</span>
@@ -385,6 +493,213 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Hyperlocal Location Intelligence & Local Economy Card */}
+      <section className="bg-gradient-to-br from-emerald-50/80 via-teal-50/60 to-sky-50/70 border border-emerald-200/90 rounded-3xl p-6 sm:p-7 shadow-xs mb-8">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-5">
+          <div className="space-y-2 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#287D73] text-white shadow-xs">
+                <Icon name="pin" size={13} />
+                <span>हाइपरलोकल जिला विश्लेषण · Hyperlocal District Intelligence</span>
+              </span>
+              {locationData?.isAiGenerated ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
+                  <Icon name="sparkles" size={12} className="text-blue-600" />
+                  <span>Gemini AI Live Synced</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <Icon name="check" size={12} className="text-emerald-700" />
+                  <span>Verified Curated Data</span>
+                </span>
+              )}
+              {locationData?.timestamp && (
+                <span className="text-[11px] text-[#5F6B76] font-medium hidden sm:inline">
+                  अपडेट: {new Date(locationData.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#17365D] tracking-tight font-['Bricolage_Grotesque']">
+              {profile.location || 'Maharajganj, Uttar Pradesh'}
+            </h2>
+
+            <p className="text-xs sm:text-sm text-[#5F6B76] max-w-3xl leading-relaxed">
+              {locationData?.insight?.economicHub ||
+                'कृषि मंडी, सौर ऊर्जा पंपिंग, डिजिटल कॉमन सर्विस सेंटर एवं ग्रामीण हस्तशिल्प में स्वरोजगार के बेहतरीन अवसर।'}
+            </p>
+          </div>
+
+          {/* Action Buttons: Detect My Location (GPS), Change District, AI Live Refresh */}
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+            <button
+              id="detect-my-location-card-btn"
+              onClick={handleDetectLocation}
+              disabled={isDetectingLocation}
+              className="px-4 py-2.5 rounded-2xl bg-[#287D73] hover:bg-[#1E6058] text-white text-xs font-extrabold transition-all shadow-md flex items-center gap-2 active:scale-95 disabled:opacity-75 cursor-pointer"
+              title="Detect current location using GPS Geolocation API"
+            >
+              <Icon
+                name={isDetectingLocation ? 'refresh' : 'pin'}
+                size={16}
+                className={isDetectingLocation ? 'animate-spin text-white' : 'text-white'}
+              />
+              <span>
+                {isDetectingLocation
+                  ? (currentLang === 'bho' ? 'जीपीएस खोज रहल बा...' : currentLang === 'en' ? 'Detecting GPS...' : 'जीपीएस खोज रहे हैं...')
+                  : '📍 Detect My Location'}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setShowDistrictSelector(!showDistrictSelector)}
+              className="px-3.5 py-2.5 rounded-2xl bg-white border border-[#DCE3EA] text-[#17365D] hover:bg-slate-50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Icon name="chev" size={14} className={showDistrictSelector ? 'rotate-180' : ''} />
+              <span>{showDistrictSelector ? 'बंद करें (Close)' : 'बदलें (Change District)'}</span>
+            </button>
+
+            {onRefreshLocationAi && (
+              <button
+                onClick={onRefreshLocationAi}
+                disabled={isRefreshingLocationData}
+                className="px-3.5 py-2.5 rounded-2xl bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-70 cursor-pointer"
+                title="Fetch live location data via Gemini AI"
+              >
+                <Icon
+                  name="sparkles"
+                  size={14}
+                  className={isRefreshingLocationData ? 'animate-spin text-blue-600' : 'text-blue-600'}
+                />
+                <span>{isRefreshingLocationData ? 'लोड हो रहा है...' : '✨ Live AI Refresh'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Expandable District Selector Dropdown Modal */}
+        {showDistrictSelector && (
+          <div className="mt-5 p-5 rounded-2xl bg-white border border-[#DCE3EA] shadow-lg animate-fade-in space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#DCE3EA]">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-[#245A91]">
+                भारतीय राज्य व जिले चुनें (Select State &amp; District)
+              </span>
+              <span className="text-xs text-[#5F6B76]">
+                GPS अनुमति न मिलने पर सीधे जिले पर क्लिक करें
+              </span>
+            </div>
+
+            {/* State Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              {POPULAR_INDIAN_REGIONS.map((region, idx) => (
+                <button
+                  key={region.state}
+                  onClick={() => setSelectedStateIndex(idx)}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-colors ${
+                    selectedStateIndex === idx
+                      ? 'bg-[#17365D] text-white'
+                      : 'bg-[#F5F7FA] text-[#5F6B76] hover:bg-[#E9ECEF]'
+                  }`}
+                >
+                  {region.stateHi} ({region.state})
+                </button>
+              ))}
+            </div>
+
+            {/* Districts Grid for selected state */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {POPULAR_INDIAN_REGIONS[selectedStateIndex]?.districts.map((dist) => {
+                const isCurrent = (profile.location || '').toLowerCase().includes(dist.name.toLowerCase());
+                return (
+                  <button
+                    key={dist.name}
+                    onClick={() => handleSelectDistrict(dist.name, POPULAR_INDIAN_REGIONS[selectedStateIndex].state)}
+                    className={`p-2.5 rounded-xl text-left border text-xs font-bold transition-all ${
+                      isCurrent
+                        ? 'border-[#287D73] bg-[#287D73]/10 text-[#287D73]'
+                        : 'border-[#DCE3EA] bg-white hover:border-[#245A91] hover:bg-[#F5F7FA] text-[#17365D]'
+                    }`}
+                  >
+                    <div>{dist.hi}</div>
+                    <div className="text-[10px] text-[#5F6B76] font-medium">{dist.name}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* District Intelligence Metrics & Fast Shortcuts */}
+        <div className="mt-5 pt-4 border-t border-emerald-200/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-100 shadow-xs">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#287D73]">
+              प्रमुख आर्थिक क्षेत्र (Top Sectors)
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {(locationData?.insight?.topSectors || ['कृषि उपकरण', 'सौर ऊर्जा', 'सिलाई-कढ़ाई', 'डिजिटल सेवा']).map((sec, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-semibold text-[11px] border border-emerald-200">
+                  {sec}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-100 shadow-xs">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#245A91]">
+              औसत मासिक वेतन (Avg Monthly Wage)
+            </div>
+            <div className="text-base font-extrabold text-[#17365D] mt-1 font-['Bricolage_Grotesque']">
+              {locationData?.insight?.averageMonthlyWage || '₹12,000 - ₹22,000 / माह'}
+            </div>
+            <div className="text-[10px] text-[#5F6B76] mt-0.5">
+              कौशल व अनुभव के आधार पर
+            </div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-100 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#17365D]">
+                नजदीकी ट्रेनिंग केंद्र (Verified Centers)
+              </div>
+              <div className="text-base font-extrabold text-[#17365D] mt-1">
+                {locationData?.trainingCenters?.length || 2}+ सरकारी संस्थान
+              </div>
+              <div className="text-[10px] text-[#5F6B76]">
+                RSETI, PMKK एवं ITI केंद्र
+              </div>
+            </div>
+            <button
+              onClick={() => go('training')}
+              className="mt-2 text-xs font-bold text-[#287D73] hover:underline inline-flex items-center gap-1"
+            >
+              <span>केंद्र देखें (View Centers)</span>
+              <Icon name="arrowR" size={12} />
+            </button>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-100 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#17365D]">
+                उपलब्ध सरकारी योजनाएं (Schemes)
+              </div>
+              <div className="text-base font-extrabold text-[#17365D] mt-1">
+                {locationData?.schemes?.length || 3}+ कल्याणकारी योजनाएं
+              </div>
+              <div className="text-[10px] text-[#5F6B76]">
+                PM विश्वकर्मा, PMKVY 4.0, मुद्रा ऋण
+              </div>
+            </div>
+            <button
+              onClick={() => go('opportunities')}
+              className="mt-2 text-xs font-bold text-[#245A91] hover:underline inline-flex items-center gap-1"
+            >
+              <span>योजनाएं देखें (View Schemes)</span>
+              <Icon name="arrowR" size={12} />
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* Main Content Area: Suggested Skill Pathways, Learning Roadmap, Opportunities */}
       <div className="space-y-8">
