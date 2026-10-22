@@ -546,8 +546,303 @@ const CURATED_DISTRICT_DATABASE: Record<string, Partial<LocationLivelihoodData>>
         financialSupport: '₹15,000 सीधे बैंक में टूलकिट हेतु'
       }
     ]
+  },
+  'ghaziabad': {
+    district: 'Ghaziabad',
+    state: 'Uttar Pradesh',
+    insight: {
+      district: 'Ghaziabad',
+      state: 'Uttar Pradesh',
+      economicHub: 'Industrial Manufacturing, E-Commerce Logistics, Electronics & NCR Retail Corridor',
+      topSectors: ['E-Commerce Logistics & Warehousing', 'Digital CSC & BPO Centers', 'Rooftop Solar & Technical Repair', 'Retail & Mall Operations'],
+      averageMonthlyWage: '₹12,000 - ₹22,000',
+      activeSchemesCount: 9,
+      openVacanciesCount: 95,
+      verifiedCentersCount: 6,
+      summary: 'गाजियाबाद-एनसीआर में साहिबाबाद, कविनगर एवं मोहन नगर औद्योगिक क्षेत्रों में लॉजिस्टिक्स, डिजिटल ऑपरेटर, सोलर और रिटेल में व्यापक रोजगार उपलब्ध हैं।',
+    },
+    opportunities: [
+      {
+        id: 'gzb-j1',
+        title: 'E-Commerce Logistics & Hub Associate',
+        org: 'NCR Warehousing & Delivery Logistics Hub',
+        type: 'Job',
+        loc: 'Sahibabad Industrial Area, Ghaziabad',
+        km: 4,
+        pay: '₹13,500 to ₹19,500 per month',
+        path: 'retail',
+        verified: true,
+        source: 'District Employment Exchange Ghaziabad',
+        lastVerifiedDate: 'October 2026',
+        eligibility: '10th/12th pass, inventory counting and smartphone app handling.',
+        documentsRequired: ['Aadhaar Card', '10th Marksheet', 'Bank Passbook'],
+        contactInfo: 'Logistics Facility Desk, Site 4, Sahibabad'
+      },
+      {
+        id: 'gzb-j2',
+        title: 'CSC Digital Seva Partner & Banking Mitra',
+        org: 'District e-Governance Society Ghaziabad',
+        type: 'Job',
+        loc: 'RDC Raj Nagar & Navyug Market, Ghaziabad',
+        km: 3,
+        pay: '₹11,000 to ₹17,000 per month',
+        path: 'digital',
+        verified: true,
+        source: 'DeGS Ghaziabad Portal',
+        lastVerifiedDate: 'October 2026',
+        eligibility: '12th pass, Hindi/English computer typing and Aadhaar portal knowledge.',
+        documentsRequired: ['Aadhaar Card', '12th Certificate'],
+        contactInfo: 'District CSC Operations Desk, Collectorate Compound'
+      },
+      {
+        id: 'gzb-j3',
+        title: 'Rooftop Solar Installation & Maintenance Technician',
+        org: 'NCR Green Energy Solutions (PM Surya Ghar Approved)',
+        type: 'Job',
+        loc: 'Kavi Nagar & Meerut Road Industrial Area, Ghaziabad',
+        km: 6,
+        pay: '₹12,500 to ₹18,500 per month',
+        path: 'solar',
+        verified: true,
+        source: 'PM Surya Ghar Approved Vendor Cluster',
+        lastVerifiedDate: 'October 2026',
+        eligibility: 'Physical fitness, basic electrical or ITI wireman training.',
+        documentsRequired: ['Aadhaar Card', 'Medical Certificate'],
+        contactInfo: 'Solar Technical Office, Meerut Road'
+      },
+      {
+        id: 'gzb-j4',
+        title: 'Garment & Boutique Cluster Production Associate',
+        org: 'Ghaziabad Apparel & Hosiery Association',
+        type: 'Self-employment',
+        loc: 'Loni Industrial Area & Mohan Nagar, Ghaziabad',
+        km: 8,
+        pay: '₹9,000 to ₹16,000 per month',
+        path: 'tailoring',
+        verified: true,
+        source: 'District Industries Center (DIC) Ghaziabad',
+        lastVerifiedDate: 'October 2026',
+        eligibility: 'Industrial sewing machine handling, cutting, and finishing.',
+        documentsRequired: ['Aadhaar Card', 'Proof of experience'],
+        contactInfo: 'Apparel Association Office, Loni Road'
+      }
+    ],
+    trainingCenters: [
+      {
+        id: 'gzb-t1',
+        title: 'Govt ITI Ghaziabad (Premier Technical Campus)',
+        org: 'Directorate of Training & Employment UP',
+        type: 'Training',
+        loc: 'Sector 23, Sanjay Nagar, Ghaziabad',
+        km: 4,
+        pay: '100% Free Govt Course + Dual Training with Industry Stipend',
+        path: 'solar',
+        verified: true,
+        source: 'NCVT / SCVT UP Portal',
+        lastVerifiedDate: 'October 2026',
+        eligibility: '10th pass, age 14 to 40.',
+        documentsRequired: ['Aadhaar Card', '10th Marksheet', 'Domicile Certificate'],
+        contactInfo: 'Principal Office, Govt ITI Sanjay Nagar, Ghaziabad'
+      },
+      {
+        id: 'gzb-t2',
+        title: 'PMKVY Kaushal Kendra (Digital & Hardware Lab)',
+        org: 'Skill India Mission Training Hub',
+        type: 'Training',
+        loc: 'Near Old Bus Stand, GT Road, Ghaziabad',
+        km: 3,
+        pay: 'Free Government-Sponsored Training with NSDC Certification',
+        path: 'digital',
+        verified: true,
+        source: 'Skill India Digital Hub',
+        lastVerifiedDate: 'October 2026',
+        eligibility: '8th or 10th pass, ages 18-35.',
+        documentsRequired: ['Aadhaar Card', 'Education Proof'],
+        contactInfo: 'Centre Director, PMKK GT Road'
+      },
+      {
+        id: 'gzb-t3',
+        title: 'RSETI PNB Lead Bank Training Center',
+        org: 'Punjab National Bank Rural Self Employment Training Institute',
+        type: 'Training',
+        loc: 'PNB Regional Office, Hapur Road, Ghaziabad',
+        km: 7,
+        pay: 'Free Residential Skilling + Free Meals + Mudra Loan Linkage',
+        path: 'tailoring',
+        verified: true,
+        source: 'MoRD RSETI Portal',
+        lastVerifiedDate: 'October 2026',
+        eligibility: 'Youth and women ages 18-45.',
+        documentsRequired: ['Aadhaar Card', 'Ration Card', 'Bank Passbook'],
+        contactInfo: 'RSETI Director, Hapur Road Campus'
+      }
+    ],
+    schemes: [
+      {
+        id: 'gzb-sch-1',
+        name: 'PM Vishwakarma Yojana (Ghaziabad DIC)',
+        hiName: 'प्रधानमंत्री विश्वकर्मा योजना',
+        benefit: '₹15,000 टूलकिट अनुदान + ₹3 लाख तक रियायती लोन (5% ब्याज दर)',
+        eligibility: '18 पारंपरिक दस्तकार एवं कारीगर',
+        applyOffice: 'जिला उद्योग केंद्र (DIC) कविनगर या नजदीकी CSC केंद्र, गाजियाबाद',
+        category: 'toolkit',
+        financialSupport: '₹15,000 टूलकिट अनुदान + ₹500/दिन वजीफा'
+      },
+      {
+        id: 'gzb-sch-2',
+        name: 'UP Mukhyamantri Yuva Swarojgar Yojana',
+        hiName: 'उत्तर प्रदेश मुख्यमंत्री युवा स्वरोजगार योजना',
+        benefit: 'उद्योग हेतु ₹25 लाख व सेवा क्षेत्र हेतु ₹10 लाख तक परियोजना लोन (25% मार्जिन मनी सब्सिडी)',
+        eligibility: '10वीं पास उत्तर प्रदेश निवासी, उम्र 18-40 वर्ष',
+        applyOffice: 'जिला उद्योग एवं उद्यम प्रोत्साहन केंद्र, गाजियाबाद',
+        category: 'state',
+        financialSupport: '₹6.25 लाख तक मार्जिन मनी अनुदान'
+      },
+      {
+        id: 'gzb-sch-3',
+        name: 'Pradhan Mantri Mudra Yojana (PMMY)',
+        hiName: 'प्रधानमंत्री मुद्रा योजना (PMMY)',
+        benefit: '₹50,000 से ₹10 लाख तक बिना गारंटी व्यवसाय ऋण',
+        eligibility: 'छोटे व्यापारी, वर्कशॉप संचालक व सेवा प्रदाता',
+        applyOffice: 'गाजियाबाद की किसी भी बैंक शाखा में',
+        category: 'loan',
+        financialSupport: 'बिना कोलेटरल 7 दिनों में स्वीकृति'
+      }
+    ]
+  },
+  'gorakhpur': {
+    district: 'Gorakhpur',
+    state: 'Uttar Pradesh',
+    insight: {
+      district: 'Gorakhpur',
+      state: 'Uttar Pradesh',
+      economicHub: 'GIDA Industrial Area, AIIMS Healthcare Corridor, Terracotta ODOP & Agro Trade',
+      topSectors: ['GIDA Industrial Manufacturing', 'Healthcare & Hospital Logistics', 'Terracotta & Readymade Garments', 'Digital Seva & Retail'],
+      averageMonthlyWage: '₹9,500 - ₹16,000',
+      activeSchemesCount: 8,
+      openVacanciesCount: 72,
+      verifiedCentersCount: 5,
+      summary: 'गोरखपुर में GIDA औद्योगिक क्षेत्र, टेराकोटा क्लस्टर और एम्स कॉरिडोर में तकनीकी, डिजिटल और उत्पादन से जुड़े व्यापक अवसर हैं।',
+    },
+    opportunities: [
+      {
+        id: 'gkp-j1',
+        title: 'Industrial Machine & Packaging Operator',
+        org: 'GIDA Industrial Manufacturing Cluster',
+        type: 'Job',
+        loc: 'GIDA Sector 13, Gorakhpur',
+        km: 12,
+        pay: '₹11,000 to ₹16,500 per month',
+        path: 'retail',
+        verified: true,
+        source: 'GIDA Industries Association',
+        lastVerifiedDate: 'October 2026',
+        eligibility: '10th/12th pass, willingness to learn production machinery.',
+        documentsRequired: ['Aadhaar Card', 'High School Marksheet'],
+        contactInfo: 'GIDA Administrative Building, Gorakhpur'
+      },
+      {
+        id: 'gkp-j2',
+        title: 'CSC E-District & Banking Mitra',
+        org: 'District e-Governance Society Gorakhpur',
+        type: 'Job',
+        loc: 'Golghar / Civil Lines, Gorakhpur',
+        km: 4,
+        pay: '₹9,500 to ₹14,000 per month',
+        path: 'digital',
+        verified: true,
+        source: 'DeGS Gorakhpur Portal',
+        lastVerifiedDate: 'October 2026',
+        eligibility: '10th pass, basic computer typing and mobile operations.',
+        documentsRequired: ['Aadhaar Card', 'Bank Passbook'],
+        contactInfo: 'Collectorate Compound, Gorakhpur'
+      },
+      {
+        id: 'gkp-j3',
+        title: 'Solar Technical & Panel Installation Helper',
+        org: 'Purvanchal Vidyut & Solar Power Solutions',
+        type: 'Job',
+        loc: 'Medical College Road, Gorakhpur',
+        km: 7,
+        pay: '₹10,000 to ₹15,500 per month',
+        path: 'solar',
+        verified: true,
+        source: 'PM Surya Ghar Purvanchal Cluster',
+        lastVerifiedDate: 'October 2026',
+        eligibility: 'Physically fit, comfortable with rooftop work.',
+        documentsRequired: ['Aadhaar Card', 'Medical Certificate'],
+        contactInfo: 'Purvanchal Solar Desk, Mohaddipur'
+      }
+    ],
+    trainingCenters: [
+      {
+        id: 'gkp-t1',
+        title: 'Govt ITI Charphatak, Gorakhpur',
+        org: 'Directorate of Vocational Training UP',
+        type: 'Training',
+        loc: 'Charphatak Road, Gorakhpur',
+        km: 5,
+        pay: 'Govt Free/Subsidized Training + Placement Linkage',
+        path: 'solar',
+        verified: true,
+        source: 'NCVT Portal',
+        lastVerifiedDate: 'October 2026',
+        eligibility: '10th pass.',
+        documentsRequired: ['Aadhaar Card', '10th Certificate'],
+        contactInfo: 'Campus Office, Charphatak ITI'
+      },
+      {
+        id: 'gkp-t2',
+        title: 'RSETI Lead Bank Training Institute (Union Bank)',
+        org: 'Union Bank of India RSETI Gorakhpur',
+        type: 'Training',
+        loc: 'Near GIDA Campus, Gorakhpur',
+        km: 14,
+        pay: '100% Free Residential Course + Free Meals + Toolkit Loan Linkage',
+        path: 'tailoring',
+        verified: true,
+        source: 'MoRD RSETI Portal',
+        lastVerifiedDate: 'October 2026',
+        eligibility: 'Ages 18-45.',
+        documentsRequired: ['Aadhaar Card', 'Ration Card'],
+        contactInfo: 'RSETI Director, Campus Desk'
+      }
+    ],
+    schemes: [
+      {
+        id: 'gkp-sch-1',
+        name: 'UP ODOP Terracotta & Craft Scheme',
+        hiName: 'उत्तर प्रदेश एक जिला एक उत्पाद (ODOP) गोरखपुर',
+        benefit: 'मुफ्त आधुनिक टूलकिट और 25% तक वित्तीय सब्सिडी',
+        eligibility: 'पारंपरिक शिल्पकार एवं हस्तशिल्पी',
+        applyOffice: 'जिला उद्योग केंद्र (DIC), गोरखपुर',
+        category: 'state',
+        financialSupport: '₹25,000 टूलकिट अनुदान'
+      }
+    ]
   }
 };
+
+/**
+ * Normalizes any Hindi or English district/location string to standard database key
+ */
+export function normalizeDistrictKey(districtStr: string): string {
+  if (!districtStr) return 'maharajganj';
+  let s = districtStr.toLowerCase().trim();
+  s = s.replace(/ज़िला|जिला|district|शहर|city|town/gi, '').trim();
+
+  if (s.includes('ghaziabad') || s.includes('गाजियाबाद') || s.includes('ग़ाज़ियाबाद')) return 'ghaziabad';
+  if (s.includes('gorakhpur') || s.includes('गोरखपुर')) return 'gorakhpur';
+  if (s.includes('lucknow') || s.includes('लखनऊ')) return 'lucknow';
+  if (s.includes('varanasi') || s.includes('वाराणसी') || s.includes('बनारस') || s.includes('kashi')) return 'varanasi';
+  if (s.includes('patna') || s.includes('पटना')) return 'patna';
+  if (s.includes('noida') || s.includes('नोएडा') || s.includes('gautam buddha')) return 'ghaziabad';
+  if (s.includes('delhi') || s.includes('दिल्ली')) return 'ghaziabad';
+  if (s.includes('kanpur') || s.includes('कानपुर')) return 'ghaziabad';
+  if (s.includes('maharajganj') || s.includes('महराजगंज')) return 'maharajganj';
+
+  return s.replace(/[^a-z0-9]/g, '') || 'maharajganj';
+}
 
 class LocationIntelligenceService {
   private activeLocation: string = 'Maharajganj, Uttar Pradesh';
@@ -636,7 +931,16 @@ class LocationIntelligenceService {
     return info;
   }
 
-  public getCachedData(): LocationLivelihoodData | null {
+  public getCachedData(locationOverride?: string): LocationLivelihoodData | null {
+    const loc = (locationOverride && locationOverride.trim()) || this.activeLocation;
+    if (this.cachedData && loc) {
+      const activeKey = normalizeDistrictKey(loc);
+      const cachedKey = normalizeDistrictKey(this.cachedData.location || '');
+      if (activeKey !== cachedKey) {
+        const parts = loc.split(',').map((p) => p.trim());
+        return this.buildFallbackData(loc, parts[0] || 'Ghaziabad', parts[1] || 'Uttar Pradesh');
+      }
+    }
     return this.cachedData;
   }
 
@@ -750,21 +1054,22 @@ class LocationIntelligenceService {
   }
 
   private buildFallbackData(loc: string, district: string, state: string): LocationLivelihoodData {
-    const key = district.toLowerCase().trim();
+    const key = normalizeDistrictKey(district);
     const curated = CURATED_DISTRICT_DATABASE[key];
     const accuracy = this.getLocationAccuracy();
+    const cleanDistrict = district.replace(/ज़िला|जिला|district/gi, '').trim() || district;
 
     if (curated) {
       return {
         location: loc,
-        district: curated.district || district,
+        district: curated.district || cleanDistrict,
         state: curated.state || state,
         isAiGenerated: false,
         timestamp: new Date().toISOString(),
         accuracyLevel: accuracy.level,
         confidenceScore: accuracy.confidenceScore,
         accuracyMeters: accuracy.accuracyMeters,
-        insight: curated.insight || this.getDefaultInsight(district, state),
+        insight: curated.insight || this.getDefaultInsight(cleanDistrict, state),
         opportunities: curated.opportunities || [],
         trainingCenters: curated.trainingCenters || [],
         schemes: curated.schemes || []
@@ -776,9 +1081,9 @@ class LocationIntelligenceService {
       {
         id: `${key}-j1`,
         title: 'CSC Digital Seva Assistant',
-        org: `${district} Digital Seva Kendra`,
+        org: `${cleanDistrict} Digital Seva Kendra`,
         type: 'Job',
-        loc: `${district} Main Market`,
+        loc: `${cleanDistrict} Main Market`,
         km: 4,
         pay: '₹8,500 to ₹13,500 per month',
         path: 'digital',
@@ -787,14 +1092,14 @@ class LocationIntelligenceService {
         lastVerifiedDate: 'October 2026',
         eligibility: '10th pass, basic computer typing and mobile app handling.',
         documentsRequired: ['Aadhaar Card', '10th Marksheet'],
-        contactInfo: `Collectorate Area, ${district}`
+        contactInfo: `Collectorate Area, ${cleanDistrict}`
       },
       {
         id: `${key}-j2`,
         title: 'Solar PV Installer & Maintenance Helper',
         org: `${state} Solar Green Power Services`,
         type: 'Job',
-        loc: `Across ${district}`,
+        loc: `Across ${cleanDistrict}`,
         km: 15,
         pay: '₹9,500 to ₹15,000 per month',
         path: 'solar',
@@ -803,14 +1108,14 @@ class LocationIntelligenceService {
         lastVerifiedDate: 'October 2026',
         eligibility: 'Physical fitness, basic electrical understanding.',
         documentsRequired: ['Aadhaar Card', 'Medical Certificate'],
-        contactInfo: `District Energy Field Desk, ${district}`
+        contactInfo: `District Energy Field Desk, ${cleanDistrict}`
       },
       {
         id: `${key}-j3`,
         title: 'Retail Store & Billing Associate',
-        org: `${district} Vyapar Kendra Outlet`,
+        org: `${cleanDistrict} Vyapar Kendra Outlet`,
         type: 'Job',
-        loc: `Station Road, ${district}`,
+        loc: `Station Road, ${cleanDistrict}`,
         km: 5,
         pay: '₹8,000 to ₹12,500 per month',
         path: 'retail',
@@ -819,14 +1124,14 @@ class LocationIntelligenceService {
         lastVerifiedDate: 'October 2026',
         eligibility: '10th pass, polite customer communication.',
         documentsRequired: ['Aadhaar Card', 'Biodata'],
-        contactInfo: `Store Manager, Station Road, ${district}`
+        contactInfo: `Store Manager, Station Road, ${cleanDistrict}`
       },
       {
         id: `${key}-j4`,
         title: 'Self-Help Group Garment & Tailoring Unit',
         org: 'NRLM Mahila Gramin Cluster',
         type: 'Self-employment',
-        loc: `Local Village / ${district}`,
+        loc: `Local Village / ${cleanDistrict}`,
         km: 0,
         pay: '₹6,000 to ₹14,000 per month',
         path: 'tailoring',
@@ -835,17 +1140,17 @@ class LocationIntelligenceService {
         lastVerifiedDate: 'October 2026',
         eligibility: 'Sewing machine operation, basic tailoring skills.',
         documentsRequired: ['Aadhaar Card', 'Bank Account'],
-        contactInfo: `Block Mission Office, ${district}`
+        contactInfo: `Block Mission Office, ${cleanDistrict}`
       }
     ];
 
     const defaultTraining: Opportunity[] = [
       {
         id: `${key}-t1`,
-        title: `Govt ITI ${district}`,
+        title: `Govt ITI ${cleanDistrict}`,
         org: `Department of Technical Education, ${state}`,
         type: 'Training',
-        loc: `Govt ITI Campus, ${district}`,
+        loc: `Govt ITI Campus, ${cleanDistrict}`,
         km: 6,
         pay: 'Government Sponsored Free/Subsidized Training',
         path: 'solar',
@@ -854,14 +1159,14 @@ class LocationIntelligenceService {
         lastVerifiedDate: 'October 2026',
         eligibility: '10th pass, ages 14-40.',
         documentsRequired: ['Aadhaar Card', '10th Marksheet'],
-        contactInfo: `Principal Office, Govt ITI ${district}`
+        contactInfo: `Principal Office, Govt ITI ${cleanDistrict}`
       },
       {
         id: `${key}-t2`,
         title: `RSETI Rural Self Employment Institute`,
         org: 'Ministry of Rural Development Lead Bank RSETI',
         type: 'Training',
-        loc: `Lead Bank Campus, ${district}`,
+        loc: `Lead Bank Campus, ${cleanDistrict}`,
         km: 12,
         pay: '100% Free Residential Training + Free Meals + Toolkit Loan Linkage',
         path: 'tailoring',
@@ -870,7 +1175,7 @@ class LocationIntelligenceService {
         lastVerifiedDate: 'October 2026',
         eligibility: 'Ages 18-45 with interest in starting own enterprise.',
         documentsRequired: ['Aadhaar Card', 'Ration Card', 'Bank Passbook'],
-        contactInfo: `RSETI Director Office, ${district}`
+        contactInfo: `RSETI Director Office, ${cleanDistrict}`
       }
     ];
 

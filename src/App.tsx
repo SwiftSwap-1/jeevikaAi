@@ -65,21 +65,28 @@ export default function App() {
   const [activeLocation, setActiveLocation] = useState<string>(() => {
     return storageService.loadProfile()?.location || locationIntelligenceService.getActiveLocation() || 'Maharajganj, Uttar Pradesh';
   });
-  const [locationData, setLocationData] = useState<LocationLivelihoodData | null>(() => locationIntelligenceService.getCachedData());
+  const [locationData, setLocationData] = useState<LocationLivelihoodData | null>(() => {
+    const initialProfileLoc = storageService.loadProfile()?.location;
+    return locationIntelligenceService.getCachedData(initialProfileLoc);
+  });
   const [isRefreshingLocationData, setIsRefreshingLocationData] = useState<boolean>(false);
 
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     return Boolean(isStandalone && !sessionStorage.getItem('jeevika_pwa_splashed'));
   });
 
-  // Subscribe to location intelligence changes & do initial fetch
+  // Subscribe to location intelligence changes & keep synced with profile.location
   useEffect(() => {
     const unsub = locationIntelligenceService.subscribe((data) => {
       setLocationData(data);
     });
-    locationIntelligenceService.fetchLocationData(activeLocation, currentLang, profile);
+    const locToFetch = profile?.location?.trim() || activeLocation;
+    if (profile?.location && profile.location.trim() !== activeLocation) {
+      setActiveLocation(profile.location.trim());
+    }
+    locationIntelligenceService.fetchLocationData(locToFetch, currentLang, profile);
     return () => unsub();
-  }, []);
+  }, [profile?.location]);
 
   useEffect(() => {
     if (showSplash) {

@@ -156,7 +156,23 @@ export function rankJobs(
   ranked: EvaluatedPathway[],
   sourceJobs?: Opportunity[]
 ): Opportunity[] {
-  const jobList = sourceJobs && sourceJobs.length > 0 ? sourceJobs : JOBS;
+  let jobList: Opportunity[];
+  if (sourceJobs && sourceJobs.length > 0) {
+    jobList = sourceJobs;
+  } else {
+    // Dynamically localize fallback jobs to user's district if sourceJobs is not yet supplied
+    const rawLoc = prof.location ? prof.location.split(',')[0].replace(/ज़िला|जिला|district/gi, '').trim() : '';
+    const userDistrict = rawLoc && rawLoc.toLowerCase() !== 'maharajganj' ? rawLoc : null;
+    jobList = userDistrict
+      ? JOBS.map((j) => ({
+          ...j,
+          loc: j.loc.replace(/Maharajganj town/gi, `${userDistrict} Market`).replace(/Maharajganj/gi, userDistrict),
+          org: j.org.replace(/Maharajganj/gi, userDistrict),
+          source: j.source.replace(/Maharajganj/gi, userDistrict),
+          contactInfo: j.contactInfo ? j.contactInfo.replace(/Maharajganj/gi, userDistrict) : undefined,
+        }))
+      : JOBS;
+  }
   const sc = Object.fromEntries(ranked.map((p) => [p.id, p.score]));
   const lim = REACH_KM[mobKey(prof.mobility)] ?? 50;
   return jobList.map((j) => ({

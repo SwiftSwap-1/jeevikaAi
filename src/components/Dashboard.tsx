@@ -396,43 +396,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Icon name="cap" size={14} className="text-[#38BDF8]" />
                 <span>शिक्षा: {profile.education || '10वीं पास'}</span>
               </span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
-                  <Icon name="pin" size={14} className="text-[#38BDF8]" />
-                  <span>स्थान: {profile.location || 'उत्तर प्रदेश'}</span>
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
+                <Icon name="pin" size={14} className="text-[#38BDF8]" />
+                <span>स्थान: {profile.location || 'उत्तर प्रदेश'}</span>
+                <span className="ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#38BDF8]/25 text-[#7DD3FC] border border-[#38BDF8]/30">
+                  {currentAccuracy.level === 'Precise' ? '🎯 GPS' : currentAccuracy.level === 'District-level' ? '🏛️ जिला' : '📍 क्षेत्र'} · {currentAccuracy.confidenceScore}% विश्वास
                 </span>
-
-                {/* Location Accuracy & Confidence Level Badge */}
-                <LocationAccuracyBadge
-                  level={currentAccuracy.level}
-                  confidenceScore={currentAccuracy.confidenceScore}
-                  accuracyMeters={currentAccuracy.accuracyMeters}
-                  locality={currentAccuracy.locality}
-                  isDarkBackground={true}
-                  currentLang={currentLang}
-                  onReDetect={handleDetectLocation}
-                  isDetecting={isDetectingLocation}
-                />
-
-                <button
-                  id="detect-my-location-hero-btn"
-                  onClick={handleDetectLocation}
-                  disabled={isDetectingLocation}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-white font-bold transition-all shadow-sm border border-[#38BDF8]/40 active:scale-95 disabled:opacity-75 cursor-pointer text-xs"
-                  title="Detect current city/district using GPS Geolocation API"
-                >
-                  <Icon
-                    name={isDetectingLocation ? 'refresh' : 'pin'}
-                    size={14}
-                    className={isDetectingLocation ? 'animate-spin text-[#38BDF8]' : 'text-[#38BDF8]'}
-                  />
-                  <span>
-                    {isDetectingLocation
-                      ? (currentLang === 'bho' ? 'स्थान खोज रहल बा...' : currentLang === 'en' ? 'Detecting GPS...' : 'स्थान खोज रहे हैं...')
-                      : '📍 Detect My Location'}
-                  </span>
-                </button>
-              </div>
+              </span>
               <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
                 <Icon name="store" size={14} className="text-[#38BDF8]" />
                 <span>काम की प्राथमिकता: {profile.workType || 'Self-employment'}</span>
@@ -552,22 +522,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-5">
           <div className="space-y-2 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#287D73] text-white shadow-xs">
-                <Icon name="pin" size={13} />
-                <span>हाइपरलोकल जिला विश्लेषण · Hyperlocal District Intelligence</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#17365D] text-white shadow-xs">
+                <Icon name="pin" size={13} className="text-[#38BDF8]" />
+                <span>जिला आजीविका एवं आर्थिक केंद्र · District Livelihood Hub</span>
               </span>
-
-              {/* Accuracy Level Indicator Badge */}
-              <LocationAccuracyBadge
-                level={currentAccuracy.level}
-                confidenceScore={currentAccuracy.confidenceScore}
-                accuracyMeters={currentAccuracy.accuracyMeters}
-                locality={currentAccuracy.locality}
-                isDarkBackground={false}
-                currentLang={currentLang}
-                onReDetect={handleDetectLocation}
-                isDetecting={isDetectingLocation}
-              />
 
               {locationData?.isAiGenerated ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
@@ -588,12 +546,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-extrabold text-[#17365D] tracking-tight font-['Bricolage_Grotesque']">
-              {profile.location || 'Maharajganj, Uttar Pradesh'}
+              📍 {profile.location || locationData?.district || 'उत्तर प्रदेश'}
             </h2>
 
             <p className="text-xs sm:text-sm text-[#5F6B76] max-w-3xl leading-relaxed">
               {locationData?.insight?.economicHub ||
-                'कृषि मंडी, सौर ऊर्जा पंपिंग, डिजिटल कॉमन सर्विस सेंटर एवं ग्रामीण हस्तशिल्प में स्वरोजगार के बेहतरीन अवसर।'}
+                'स्थानीय औद्योगिक केंद्र, सौर ऊर्जा, डिजिटल कॉमन सर्विस सेंटर एवं ग्रामीण हस्तशिल्प में स्वरोजगार के अवसर।'}
             </p>
           </div>
 
@@ -607,14 +565,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
               title="Detect current location using GPS Geolocation API"
             >
               <Icon
-                name={isDetectingLocation ? 'refresh' : 'pin'}
-                size={16}
+                name={isDetectingLocation ? 'refresh' : 'target'}
+                size={15}
                 className={isDetectingLocation ? 'animate-spin text-white' : 'text-white'}
               />
               <span>
                 {isDetectingLocation
                   ? (currentLang === 'bho' ? 'जीपीएस खोज रहल बा...' : currentLang === 'en' ? 'Detecting GPS...' : 'जीपीएस खोज रहे हैं...')
-                  : '📍 Detect My Location'}
+                  : (currentLang === 'bho' ? '📍 जीपीएस से पहचानल जाव' : currentLang === 'en' ? '📍 Detect GPS Location' : '📍 जीपीएस से पहचानें (GPS Detect)')}
               </span>
             </button>
 
@@ -623,7 +581,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               className="px-3.5 py-2.5 rounded-2xl bg-white border border-[#DCE3EA] text-[#17365D] hover:bg-slate-50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Icon name="chev" size={14} className={showDistrictSelector ? 'rotate-180' : ''} />
-              <span>{showDistrictSelector ? 'बंद करें (Close)' : 'बदलें (Change District)'}</span>
+              <span>{showDistrictSelector ? 'बंद करें (Close)' : '🏛️ जिला बदलें (Change District)'}</span>
             </button>
 
             {onRefreshLocationAi && (
@@ -696,19 +654,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
 
-        {/* Automatic Location Precision & Confidence Score Card */}
-        <div className="mt-5">
-          <LocationAccuracyBadge
-            level={currentAccuracy.level}
-            confidenceScore={currentAccuracy.confidenceScore}
-            accuracyMeters={currentAccuracy.accuracyMeters}
-            locality={currentAccuracy.locality}
-            variant="card"
-            isDarkBackground={false}
-            currentLang={currentLang}
-            onReDetect={handleDetectLocation}
-            isDetecting={isDetectingLocation}
-          />
+        {/* Precision & District Coverage Status Strip */}
+        <div className="mt-4 p-3.5 rounded-2xl bg-white/75 border border-emerald-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 rounded-xl bg-[#287D73]/15 text-[#287D73]">
+              <Icon name="target" size={16} />
+            </span>
+            <div>
+              <span className="font-bold text-[#17365D]">
+                स्थानीय कवरेज व सटीकता:{' '}
+              </span>
+              <span className="text-[#5F6B76]">
+                {currentAccuracy.level === 'Precise'
+                  ? `उच्च सटीकता GPS फिक्स (${currentAccuracy.accuracyMeters ? `±${currentAccuracy.accuracyMeters}m` : '100m के भीतर'}) · 5–15 किमी के रोजगार व केंद्र सक्रिय हैं`
+                  : currentAccuracy.level === 'District-level'
+                  ? `जिला प्रशासनिक दायरा (${profile.location || locationData?.district || 'स्थानीय'}) · संपूर्ण जिले के RSETI, PMKK, ITI व रोजगार सक्रिय हैं`
+                  : 'राज्य स्तरीय कवरेज'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-[#17365D] text-white">
+              {currentAccuracy.confidenceScore}% डेटा विश्वास
+            </span>
+            {currentAccuracy.locality && (
+              <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                📍 {currentAccuracy.locality}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* District Intelligence Metrics & Fast Shortcuts */}
@@ -1025,11 +999,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
               <div className="text-xs uppercase font-extrabold tracking-widest text-[#245A91] mb-1">
-                Local Openings
+                📍 {locationData?.district || profile.location || 'स्थानीय'} Livelihood Openings
               </div>
               <h2 className="text-2xl font-extrabold text-[#17365D]">
-                Matched Livelihood Opportunities · पास के रोजगार अवसर
+                Matched Opportunities · {locationData?.district || profile.location || 'स्थानीय'} के रोजगार व प्रशिक्षण
               </h2>
+              <div className="flex items-center gap-2 mt-1 text-xs text-[#5F6B76]">
+                <span className="inline-flex items-center gap-1 font-bold text-[#287D73]">
+                  <Icon name="check" size={13} />
+                  <span>{locationData?.district || profile.location || 'स्थानीय'} के अनुसार सत्यापित अवसर</span>
+                </span>
+                <span>·</span>
+                <span>{filteredJobs.length} अवसर उपलब्ध</span>
+              </div>
             </div>
 
             {/* Filter Tabs */}
