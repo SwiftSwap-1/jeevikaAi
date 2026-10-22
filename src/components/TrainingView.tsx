@@ -50,9 +50,6 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
           <h1 className="text-3xl font-extrabold text-[#17365D]">
             {t('train.title', currentLang)}
           </h1>
-          <p className="text-sm text-[#5F6B76] mt-1">
-            {t('train.subtitle', currentLang)}
-          </p>
         </div>
 
         <button

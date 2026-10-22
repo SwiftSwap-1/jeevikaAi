@@ -37,7 +37,7 @@ export const t = (key: string, lang: SupportedLanguage = 'hi'): string => {
     // Opportunities View
     'opp.badge': { hi: 'हाइपरलोकल आजीविका निर्देशिका', bho: 'हाइपरलोकल आजीविका निर्देशिका', en: 'Hyperlocal Livelihood Directory', hin: 'Hyperlocal Livelihood Directory' },
     'opp.title': { hi: 'रोजगार एवं स्वरोजगार के अवसर', bho: 'रोजगार एवं स्वरोजगार के अवसर', en: 'Livelihood & Work Opportunities', hin: 'Livelihood & Work Opportunities' },
-    'opp.subtitle': { hi: 'सत्यापित स्थानीय नौकरियाँ, दुकान के काम और डिजिटल सेवा केंद्र आपकी दूरी के अनुसार।', bho: 'सत्यापित स्थानीय नौकरियाँ अउर डिजिटल सेवा केंद्र।', en: 'Verified local openings, shop roles, digital seva setups, and craft clusters matched to travel range.', hin: 'Verified local openings, shop roles, digital seva setups, and craft clusters matched to travel range.' },
+    'opp.subtitle': { hi: '', bho: '', en: '', hin: '' },
     'opp.calculateScore': { hi: 'मेल स्कोर गणना करें', bho: 'मेल स्कोर गणना करीं', en: 'Calculate Match Score', hin: 'Calculate Match Score' },
     'opp.tabAll': { hi: 'सभी अवसर', bho: 'सब अवसर', en: 'All Openings', hin: 'All Openings' },
     'opp.tabNearby': { hi: 'पास में (≤ 10 किमी)', bho: 'लगे (≤ 10 किमी)', en: 'Nearby (≤ 10 km)', hin: 'Nearby (≤ 10 km)' },
@@ -48,7 +48,7 @@ export const t = (key: string, lang: SupportedLanguage = 'hi'): string => {
     // Training View
     'train.badge': { hi: 'सरकारी और प्रमाणित कौशल केंद्र', bho: 'सरकारी अउर प्रमाणित कौशल केंद्र', en: 'Government & Certified Vocational Centers', hin: 'Government & Certified Vocational Centers' },
     'train.title': { hi: 'प्रशिक्षण एवं कौशल केंद्र', bho: 'प्रशिक्षण एवं कौशल केंद्र', en: 'Training Opportunities & Centers', hin: 'Training Opportunities & Centers' },
-    'train.subtitle': { hi: 'निशुल्क प्रशिक्षण कार्यक्रम (पीएमकेवीवाई, आरसेटी) जो टूलकिट और प्लेसमेंट सहायता प्रदान करते हैं।', bho: 'निशुल्क प्रशिक्षण कार्यक्रम (PMKVY, RSETI)।', en: 'Certified skill development programs (PMKVY, RSETI, State Missions) providing free training, toolkits, and placement assistance.', hin: 'Certified skill development programs (PMKVY, RSETI, State Missions) providing free training, toolkits, and placement assistance.' },
+    'train.subtitle': { hi: '', bho: '', en: '', hin: '' },
     'train.matchVoice': { hi: 'बोलकर मैच करें', bho: 'बोल के मैच करीं', en: 'Match via Voice Assessment', hin: 'Match via Voice Assessment' },
     'train.tabAll': { hi: 'सभी केंद्र', bho: 'सब केंद्र', en: 'All Centers', hin: 'All Centers' },
     'train.tabDigital': { hi: 'डिजिटल और आईटी', bho: 'डिजिटल अउर आईटी', en: 'Digital & IT', hin: 'Digital & IT' },

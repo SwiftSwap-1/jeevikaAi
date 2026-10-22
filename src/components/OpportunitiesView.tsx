@@ -67,9 +67,6 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
           <h1 className="text-3xl font-extrabold text-[#17365D]">
             {t('opp.title', currentLang)}
           </h1>
-          <p className="text-sm text-[#5F6B76] mt-1">
-            {t('opp.subtitle', currentLang)}
-          </p>
         </div>
 
         <button

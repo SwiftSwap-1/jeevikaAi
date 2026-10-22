@@ -254,9 +254,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <h1 className="text-3xl font-extrabold text-[#17365D]">
             Profile Settings · प्रोफ़ाइल प्रबंधन
           </h1>
-          <p className="text-sm text-[#5F6B76] mt-1">
-            Review, edit, or refine your recorded education, skills, and livelihood preferences via voice or form.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">

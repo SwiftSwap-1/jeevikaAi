@@ -30,9 +30,6 @@ export const SavedView: React.FC<SavedViewProps> = ({
           <h1 className="text-3xl font-extrabold text-[#17365D]">
             Saved Opportunities &amp; Pathways · सहेजे गए अवसर
           </h1>
-          <p className="text-sm text-[#5F6B76] mt-1">
-            Review your shortlisted vacancies, self-employment setups, and training centers.
-          </p>
         </div>
 
         <button
