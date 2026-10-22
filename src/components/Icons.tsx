@@ -33,7 +33,14 @@ import {
   Sparkles,
   RefreshCw,
   PhoneCall,
-  WifiOff
+  WifiOff,
+  Target,
+  Compass,
+  Crosshair,
+  ShieldCheck,
+  Search,
+  Zap,
+  Navigation
 } from 'lucide-react';
 
 interface IconProps {
@@ -79,6 +86,13 @@ export const Icon: React.FC<IconProps> = ({ name, size = 20, className = '', sty
     case 'refresh': return <RefreshCw size={size} className={className} style={style} />;
     case 'phone': return <PhoneCall size={size} className={className} style={style} />;
     case 'wifiOff': return <WifiOff size={size} className={className} style={style} />;
+    case 'target': return <Target size={size} className={className} style={style} />;
+    case 'compass': return <Compass size={size} className={className} style={style} />;
+    case 'crosshair': return <Crosshair size={size} className={className} style={style} />;
+    case 'shieldCheck': return <ShieldCheck size={size} className={className} style={style} />;
+    case 'search': return <Search size={size} className={className} style={style} />;
+    case 'zap': return <Zap size={size} className={className} style={style} />;
+    case 'navigation': return <Navigation size={size} className={className} style={style} />;
     default: return null;
   }
 };

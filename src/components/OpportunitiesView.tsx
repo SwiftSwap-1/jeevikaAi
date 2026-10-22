@@ -3,7 +3,6 @@ import { Icon } from './Icons';
 import { Opportunity, SupportedLanguage, LocationLivelihoodData, BeneficiaryProfile } from '../types';
 import { JOBS } from '../data/mockData';
 import { t } from '../services/translationService';
-import { LocationBar } from './LocationBar';
 
 interface OpportunitiesViewProps {
   onShortlistToggle: (id: string) => void;
@@ -82,16 +81,53 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
         </button>
       </div>
 
-      {/* Location Bar with GPS and AI Live Fetch */}
-      <LocationBar
-        currentLocation={locationData?.location || userProfile?.location || 'Maharajganj, Uttar Pradesh'}
-        onLocationChange={(newLoc) => onLocationChange && onLocationChange(newLoc)}
-        onRefreshAi={onRefreshAi || (async () => {})}
-        isRefreshing={isRefreshingAi}
-        isAiGenerated={Boolean(locationData?.isAiGenerated)}
-        insight={locationData?.insight}
-        currentLang={currentLang}
-      />
+      {/* Systematic Profile Location Synced Banner */}
+      <div className="bg-gradient-to-r from-[#F5F7FA] to-[#E3F1FA] border border-[#245A91]/20 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#245A91] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+            <Icon name="map" size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-[#5F6B76] uppercase tracking-wider">
+                {currentLang === 'bho'
+                  ? 'रउआ प्रोफ़ाइल के अनुसार स्थान'
+                  : currentLang === 'en'
+                  ? 'Profile Location (Auto-Synced)'
+                  : 'आपकी प्रोफ़ाइल के अनुसार स्थान'}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                {currentLang === 'bho' ? 'सक्रिय' : currentLang === 'en' ? 'Active & Synced' : 'सक्रिय व सिंक'}
+              </span>
+            </div>
+            <div className="text-base font-extrabold text-[#17365D]">
+              📍 {locationData?.location || userProfile?.location || 'Maharajganj, Uttar Pradesh'}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {Boolean(availableOpportunities?.length) && (
+            <span className="text-xs text-[#5F6B76] font-medium hidden md:inline">
+              {availableOpportunities.length} स्थानीय अवसर उपलब्ध
+            </span>
+          )}
+          <button
+            onClick={() => go('dashboard')}
+            className="px-3.5 py-2 rounded-xl border border-[#DCE3EA] bg-white text-xs font-bold text-[#17365D] hover:bg-[#F5F7FA] transition-colors flex items-center gap-1.5 shadow-2xs"
+          >
+            <Icon name="user" size={14} />
+            <span>
+              {currentLang === 'bho'
+                ? 'डैशबोर्ड में बदलीं'
+                : currentLang === 'en'
+                ? 'Manage in Dashboard'
+                : 'डैशबोर्ड से बदलें'}
+            </span>
+          </button>
+        </div>
+      </div>
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6">

@@ -1,11 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { Icon } from './Icons';
-import { BeneficiaryProfile, SupportedLanguage, Opportunity, AppView, SummaryModalData, LocationLivelihoodData } from '../types';
+import {
+  BeneficiaryProfile,
+  SupportedLanguage,
+  Opportunity,
+  AppView,
+  SummaryModalData,
+  LocationLivelihoodData,
+  LocationAccuracyLevel,
+} from '../types';
 import { rankPaths, rankJobs, splitList, kmLabel, buildSummary, slug } from '../services/recommendationEngine';
 import { STAGE_TITLES } from '../data/mockData';
 import { speechService } from '../services/speechService';
 import { storageService } from '../services/storageService';
 import { locationIntelligenceService, POPULAR_INDIAN_REGIONS } from '../services/locationIntelligenceService';
+import { LocationAccuracyBadge } from './LocationAccuracyBadge';
 
 interface DashboardProps {
   profile: BeneficiaryProfile;
@@ -71,7 +80,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const rankedPaths = useMemo(() => rankPaths(profile), [profile]);
   const topPaths = rankedPaths.slice(0, 3);
-  const jobs = useMemo(() => rankJobs(profile, rankedPaths), [profile, rankedPaths]);
+  const jobs = useMemo(
+    () => rankJobs(profile, rankedPaths, locationData?.opportunities),
+    [profile, rankedPaths, locationData?.opportunities]
+  );
 
   const [expandedWhy, setExpandedWhy] = useState<Record<string, boolean>>({});
   const [selectedPathId, setSelectedPathId] = useState<string>(topPaths[0]?.id || rankedPaths[0]?.id);
@@ -89,6 +101,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const displayName = profile.name && profile.name.trim() ? profile.name.trim() : 'लाभार्थी (Beneficiary)';
   const displayInitial = displayName.charAt(0).toUpperCase();
 
+  // Active Accuracy and Confidence level computation
+  const currentAccuracy = useMemo(() => {
+    if (profile.locationAccuracy && profile.locationConfidence) {
+      return {
+        level: profile.locationAccuracy,
+        confidenceScore: profile.locationConfidence,
+        accuracyMeters: profile.locationAccuracyMeters,
+        source: 'gps' as const,
+      };
+    }
+    if (locationData?.accuracyLevel && locationData?.confidenceScore) {
+      return {
+        level: locationData.accuracyLevel,
+        confidenceScore: locationData.confidenceScore,
+        accuracyMeters: locationData.accuracyMeters,
+        source: 'gps' as const,
+      };
+    }
+    return locationIntelligenceService.getLocationAccuracy();
+  }, [profile.locationAccuracy, profile.locationConfidence, profile.locationAccuracyMeters, locationData]);
+
   const handleDetectLocation = async () => {
     if (isDetectingLocation) return;
     setIsDetectingLocation(true);
@@ -105,7 +138,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (res && res.location) {
         const updated: BeneficiaryProfile = {
           ...profile,
-          location: res.location
+          location: res.location,
+          locationAccuracy: res.accuracyLevel,
+          locationConfidence: res.confidenceScore,
+          locationAccuracyMeters: res.accuracyMeters,
         };
         if (onUpdateProfile) {
           onUpdateProfile(updated);
@@ -115,10 +151,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         }
         onNotify(
           currentLang === 'bho'
-            ? `स्थान मिल गइल: ${res.location}`
+            ? `स्थान मिल गइल: ${res.location} (${res.accuracyLevel} परिशुद्धता · ${res.confidenceScore}% विश्वास)`
             : currentLang === 'en'
-            ? `Location detected: ${res.location}`
-            : `स्थान सफलतापूर्वक प्राप्त हुआ: ${res.location}`
+            ? `Location detected: ${res.location} (${res.accuracyLevel} · ${res.confidenceScore}% confidence)`
+            : `स्थान प्राप्त हुआ: ${res.location} (${res.accuracyLevel} परिशुद्धता · ${res.confidenceScore}% विश्वास)`
         );
       }
     } catch (err: any) {
@@ -140,10 +176,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const handleSelectDistrict = (districtName: string, stateName: string) => {
+    const accuracyInfo = locationIntelligenceService.setManualDistrict(districtName, stateName);
     const newLoc = `${districtName}, ${stateName}`;
     const updated: BeneficiaryProfile = {
       ...profile,
-      location: newLoc
+      location: newLoc,
+      locationAccuracy: accuracyInfo.level,
+      locationConfidence: accuracyInfo.confidenceScore,
+      locationAccuracyMeters: undefined,
     };
     if (onUpdateProfile) {
       onUpdateProfile(updated);
@@ -154,10 +194,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setShowDistrictSelector(false);
     onNotify(
       currentLang === 'bho'
-        ? `स्थान बदलल गइल: ${newLoc}`
+        ? `स्थान बदलल गइल: ${newLoc} (जिला स्तर · 88% विश्वास)`
         : currentLang === 'en'
-        ? `Location set to: ${newLoc}`
-        : `स्थान सेट हुआ: ${newLoc}`
+        ? `Location set to: ${newLoc} (District-level · 88% confidence)`
+        : `स्थान सेट हुआ: ${newLoc} (जिला स्तर · 88% विश्वास)`
     );
   };
 
@@ -361,6 +401,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <Icon name="pin" size={14} className="text-[#38BDF8]" />
                   <span>स्थान: {profile.location || 'उत्तर प्रदेश'}</span>
                 </span>
+
+                {/* Location Accuracy & Confidence Level Badge */}
+                <LocationAccuracyBadge
+                  level={currentAccuracy.level}
+                  confidenceScore={currentAccuracy.confidenceScore}
+                  accuracyMeters={currentAccuracy.accuracyMeters}
+                  locality={currentAccuracy.locality}
+                  isDarkBackground={true}
+                  currentLang={currentLang}
+                  onReDetect={handleDetectLocation}
+                  isDetecting={isDetectingLocation}
+                />
+
                 <button
                   id="detect-my-location-hero-btn"
                   onClick={handleDetectLocation}
@@ -503,6 +556,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Icon name="pin" size={13} />
                 <span>हाइपरलोकल जिला विश्लेषण · Hyperlocal District Intelligence</span>
               </span>
+
+              {/* Accuracy Level Indicator Badge */}
+              <LocationAccuracyBadge
+                level={currentAccuracy.level}
+                confidenceScore={currentAccuracy.confidenceScore}
+                accuracyMeters={currentAccuracy.accuracyMeters}
+                locality={currentAccuracy.locality}
+                isDarkBackground={false}
+                currentLang={currentLang}
+                onReDetect={handleDetectLocation}
+                isDetecting={isDetectingLocation}
+              />
+
               {locationData?.isAiGenerated ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
                   <Icon name="sparkles" size={12} className="text-blue-600" />
@@ -629,6 +695,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
         )}
+
+        {/* Automatic Location Precision & Confidence Score Card */}
+        <div className="mt-5">
+          <LocationAccuracyBadge
+            level={currentAccuracy.level}
+            confidenceScore={currentAccuracy.confidenceScore}
+            accuracyMeters={currentAccuracy.accuracyMeters}
+            locality={currentAccuracy.locality}
+            variant="card"
+            isDarkBackground={false}
+            currentLang={currentLang}
+            onReDetect={handleDetectLocation}
+            isDetecting={isDetectingLocation}
+          />
+        </div>
 
         {/* District Intelligence Metrics & Fast Shortcuts */}
         <div className="mt-5 pt-4 border-t border-emerald-200/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

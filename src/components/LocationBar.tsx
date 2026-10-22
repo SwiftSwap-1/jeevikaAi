@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Icon } from './Icons';
 import { SupportedLanguage, LocationInsight } from '../types';
 import { POPULAR_INDIAN_REGIONS, locationIntelligenceService } from '../services/locationIntelligenceService';
+import { LocationAccuracyBadge } from './LocationAccuracyBadge';
 
 interface LocationBarProps {
   currentLocation: string;
@@ -28,6 +29,8 @@ export const LocationBar: React.FC<LocationBarProps> = ({
   const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
 
+  const accuracy = locationIntelligenceService.getLocationAccuracy();
+
   const handleGpsDetect = async () => {
     setIsDetectingGps(true);
     setGpsError(null);
@@ -51,6 +54,7 @@ export const LocationBar: React.FC<LocationBarProps> = ({
   };
 
   const handleSelectDistrict = (districtName: string, stateName: string) => {
+    locationIntelligenceService.setManualDistrict(districtName, stateName);
     const full = `${districtName}, ${stateName}`;
     onLocationChange(full);
     setShowPicker(false);
@@ -59,7 +63,14 @@ export const LocationBar: React.FC<LocationBarProps> = ({
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customInput.trim()) return;
-    onLocationChange(customInput.trim());
+    const val = customInput.trim();
+    locationIntelligenceService.setActiveLocation(val, {
+      level: 'District-level',
+      confidenceScore: 82,
+      source: 'manual',
+      description: `कस्टम स्थान: ${val}`
+    });
+    onLocationChange(val);
     setCustomInput('');
     setShowPicker(false);
   };
@@ -76,6 +87,18 @@ export const LocationBar: React.FC<LocationBarProps> = ({
               <span className="text-amber-300">📍</span>
               <span>{currentLang === 'bho' ? 'रउआ जिला / क्षेत्र' : currentLang === 'en' ? 'Active District' : 'सक्रिय कार्यक्षेत्र'}</span>
             </span>
+
+            {/* Location Precision & Confidence Score Badge */}
+            <LocationAccuracyBadge
+              level={accuracy.level}
+              confidenceScore={accuracy.confidenceScore}
+              accuracyMeters={accuracy.accuracyMeters}
+              locality={accuracy.locality}
+              isDarkBackground={true}
+              currentLang={currentLang}
+              onReDetect={handleGpsDetect}
+              isDetecting={isDetectingGps}
+            />
 
             {isAiGenerated ? (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">

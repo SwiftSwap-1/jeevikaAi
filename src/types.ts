@@ -5,6 +5,18 @@ export interface ProfileAIAnalysis {
   keyStrengths?: string[];
 }
 
+export type LocationAccuracyLevel = 'Precise' | 'District-level' | 'State-level';
+
+export interface LocationAccuracyInfo {
+  level: LocationAccuracyLevel;
+  confidenceScore: number; // Percentage 0 - 100 (e.g., 96 for Precise, 85 for District-level, 60 for State-level)
+  accuracyMeters?: number; // Geolocation radius in meters
+  locality?: string; // Village, town, suburb or neighborhood
+  pincode?: string;
+  source?: 'gps' | 'manual' | 'cache' | 'default';
+  description?: string;
+}
+
 export interface BeneficiaryProfile {
   name: string;
   education: string;
@@ -16,6 +28,9 @@ export interface BeneficiaryProfile {
   mobility: string;
   isDemo?: boolean;
   aiAnalysis?: ProfileAIAnalysis;
+  locationAccuracy?: LocationAccuracyLevel;
+  locationConfidence?: number;
+  locationAccuracyMeters?: number;
 }
 
 export interface StepQuestion {
@@ -203,6 +218,9 @@ export interface LocationLivelihoodData {
   state: string;
   isAiGenerated: boolean;
   timestamp: string;
+  accuracyLevel?: LocationAccuracyLevel;
+  confidenceScore?: number;
+  accuracyMeters?: number;
   insight: LocationInsight;
   opportunities: Opportunity[];
   trainingCenters: Opportunity[];

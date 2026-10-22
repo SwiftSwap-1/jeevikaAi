@@ -156,11 +156,19 @@ export default function App() {
     setCurrentView('dashboard');
     window.scrollTo({ top: 0, behavior: 'instant' });
 
-    // 2. Persist confirmed profile into state and storage
+    // 2. Determine target location from profile (or fallback) and systematically synchronize active location
+    const targetLoc = (newProfile.location && newProfile.location.trim())
+      ? newProfile.location.trim()
+      : (activeLocation || 'Maharajganj, Uttar Pradesh');
+
+    setActiveLocation(targetLoc);
+    locationIntelligenceService.setActiveLocation(targetLoc);
+
+    // 3. Persist confirmed profile into state and storage
     setProfile(newProfile);
     await storageService.saveProfile(newProfile);
 
-    // 3. Prevent accidental navigation back to previous assessment steps
+    // 4. Prevent accidental navigation back to previous assessment steps
     try {
       localStorage.removeItem('jeevika_current_step_v1');
       sessionStorage.removeItem('jeevika_current_step_v1');
@@ -169,50 +177,56 @@ export default function App() {
       // Ignore
     }
 
-    // 4. Initiate AI profile analysis overlay & stage progression
+    // 5. Initiate AI profile analysis overlay & stage progression
     setIsAnalyzingProfile(true);
     setAnalysisStep(1);
 
-    const step1Timer = setTimeout(() => setAnalysisStep(2), 450);
-    const step2Timer = setTimeout(() => setAnalysisStep(3), 900);
+    const step1Timer = setTimeout(() => setAnalysisStep(2), 500);
+    const step2Timer = setTimeout(() => setAnalysisStep(3), 1000);
 
     let analyzedProfile = { ...newProfile };
 
     try {
-      const res = await fetch('/api/analyze-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile: newProfile, language: currentLang })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.analysis) {
-          analyzedProfile = {
-            ...analyzedProfile,
-            aiAnalysis: data.analysis
-          };
-          await storageService.saveProfile(analyzedProfile);
-        }
+      // Fetch profile analysis AND real location-wise livelihood data concurrently during the synthesis animation
+      const [profileAnalysisRes, locationDataRes] = await Promise.allSettled([
+        fetch('/api/analyze-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: newProfile, language: currentLang })
+        }).then((res) => (res.ok ? res.json() : null)),
+        locationIntelligenceService.fetchLocationData(targetLoc, currentLang, newProfile)
+      ]);
+
+      if (profileAnalysisRes.status === 'fulfilled' && profileAnalysisRes.value?.analysis) {
+        analyzedProfile = {
+          ...analyzedProfile,
+          aiAnalysis: profileAnalysisRes.value.analysis
+        };
+        await storageService.saveProfile(analyzedProfile);
+      }
+
+      if (locationDataRes.status === 'fulfilled' && locationDataRes.value) {
+        setLocationData(locationDataRes.value);
       }
     } catch {
       // Graceful fallback
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1400));
+    await new Promise((resolve) => setTimeout(resolve, 1600));
     clearTimeout(step1Timer);
     clearTimeout(step2Timer);
 
-    // 5. Update application state with analyzed profile and dismiss loading
+    // 6. Update application state with fully analyzed profile and dismiss loading
     setProfile(analyzedProfile);
     setIsAnalyzingProfile(false);
 
-    // 6. Notify user
+    // 7. Notify user
     notify(
       currentLang === 'bho'
-        ? `रोडमैप तैयार भइल! ${analyzedProfile.name} खातिर सुझाव लोड हो गइल बा।`
+        ? `रोडमैप तैयार भइल! ${analyzedProfile.name} खातिर ${targetLoc} के अनुसार अवसर लोड हो गइल बा।`
         : currentLang === 'en'
-        ? `Livelihood roadmap generated for ${analyzedProfile.name}!`
-        : `रोडमैप तैयार हुआ! ${analyzedProfile.name} के लिए व्यक्तिगत सुझाव लोड हो गए हैं।`
+        ? `Personalized dashboard ready for ${analyzedProfile.name} with opportunities in ${targetLoc}!`
+        : `रोडमैप तैयार हुआ! ${analyzedProfile.name} के लिए ${targetLoc} के अवसर लोड हो गए हैं।`
     );
   };
 
@@ -265,9 +279,16 @@ export default function App() {
 
   const handleLocationChange = async (newLocation: string) => {
     setActiveLocation(newLocation);
+    const accuracy = locationIntelligenceService.getLocationAccuracy();
     locationIntelligenceService.setActiveLocation(newLocation);
     if (profile) {
-      const updated = { ...profile, location: newLocation };
+      const updated = {
+        ...profile,
+        location: newLocation,
+        locationAccuracy: accuracy.level,
+        locationConfidence: accuracy.confidenceScore,
+        locationAccuracyMeters: accuracy.accuracyMeters,
+      };
       setProfile(updated);
       storageService.saveProfile(updated);
     }
@@ -277,10 +298,10 @@ export default function App() {
       setLocationData(fresh);
       notify(
         currentLang === 'bho'
-          ? `स्थान बदलल गइल: ${newLocation}`
+          ? `स्थान बदलल गइल: ${newLocation} (${accuracy.level})`
           : currentLang === 'en'
-          ? `Location updated to: ${newLocation}`
-          : `स्थान अपडेट हुआ: ${newLocation}`
+          ? `Location updated to: ${newLocation} (${accuracy.level})`
+          : `स्थान अपडेट हुआ: ${newLocation} (${accuracy.level})`
       );
     } catch {
       // Handled in service
@@ -655,7 +676,11 @@ export default function App() {
                   <span className="w-5 h-5 rounded-full border-2 border-slate-300" />
                 )}
                 <span className={analysisStep >= 3 ? 'font-bold text-[#17365D]' : 'text-[#5F6B76]'}>
-                  {currentLang === 'bho' ? 'हाइपरलोकल रोजगार अउर ट्रेनिंग केंद्र' : 'Hyperlocal Opportunities & Roadmap'}
+                  {currentLang === 'bho'
+                    ? `हाइपरलोकल रोजगार अउर ट्रेनिंग केंद्र (${activeLocation})`
+                    : currentLang === 'en'
+                    ? `Hyperlocal Jobs & Certified Centers (${activeLocation})`
+                    : `हाइपरलोकल रोजगार व ट्रेनिंग केंद्र (${activeLocation})`}
                 </span>
               </div>
             </div>

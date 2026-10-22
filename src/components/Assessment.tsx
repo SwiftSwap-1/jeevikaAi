@@ -11,6 +11,7 @@ import { speechService, SpeechRecognitionResultWrapper } from '../services/speec
 import { splitList } from '../services/recommendationEngine';
 import { storageService } from '../services/storageService';
 import { firestoreService } from '../services/firebase';
+import { locationIntelligenceService, POPULAR_INDIAN_REGIONS } from '../services/locationIntelligenceService';
 import { AudioVisualizer } from './AudioVisualizer';
 
 interface AssessmentProps {
@@ -62,6 +63,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
   const [turnCounter, setTurnCounter] = useState<number>(0);
+  const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
 
   const [consentGranted, setConsentGranted] = useState<boolean>(() => {
     return Boolean(localStorage.getItem('jeevika_consent_given'));
@@ -99,31 +101,29 @@ export const Assessment: React.FC<AssessmentProps> = ({
     };
   }, []);
 
-  // Automatically fetch GPS geolocation when entering location step
+  // Automatically fetch GPS geolocation when entering location step if not already set
   useEffect(() => {
     if (currentStepIndex >= 0 && STEPS[currentStepIndex]?.key === 'location' && !answers.location) {
-      if (typeof window !== 'undefined' && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            try {
-              const { latitude, longitude } = position.coords;
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`);
-              const data = await res.json();
-              const district = data.address?.state_district || data.address?.county || data.address?.city || data.address?.town || data.address?.state;
-              if (district) {
-                const locVal = `${district}, ${data.address?.state || 'India'}`;
-                setAnswers(prev => ({ ...prev, location: locVal }));
-                profileRef.current = { ...profileRef.current, location: locVal };
-                onNotify(`📍 GPS Location detected: ${locVal}`);
-              }
-            } catch {
-              // Ignore reverse geocode failures gracefully
-            }
-          },
-          () => {},
-          { timeout: 6000 }
-        );
-      }
+      locationIntelligenceService.detectGpsLocation().then((res) => {
+        if (!res) return;
+        setAnswers((prev) => ({
+          ...prev,
+          location: res.location,
+          locationAccuracy: res.accuracyLevel,
+          locationConfidence: res.confidenceScore,
+          locationAccuracyMeters: res.accuracyMeters,
+        }));
+        profileRef.current = {
+          ...profileRef.current,
+          location: res.location,
+          locationAccuracy: res.accuracyLevel,
+          locationConfidence: res.confidenceScore,
+          locationAccuracyMeters: res.accuracyMeters,
+        };
+        onNotify(`📍 GPS Location: ${res.location} (${res.accuracyLevel} · ${res.confidenceScore}%)`);
+      }).catch(() => {
+        // Ignore fallback
+      });
     }
   }, [currentStepIndex, answers.location, onNotify]);
 
@@ -528,6 +528,130 @@ export const Assessment: React.FC<AssessmentProps> = ({
     const nextStepIdx = currentStepIndex + 1;
     if (nextStepIdx < STEPS.length) {
       askQuestionAloud(nextStepIdx);
+    } else {
+      setCurrentStepIndex(8);
+      activeStepRef.current = 8;
+      setConversationState('readback_review');
+      initiateReadbackSummary();
+    }
+  };
+
+  // GPS Auto-detection handler with precision calculation
+  const handleDetectLocationGps = async () => {
+    if (isDetectingGps) return;
+    setIsDetectingGps(true);
+    onNotify(
+      currentLang === 'bho'
+        ? 'जीपीएस से स्थान खोजल जा रहल बा... (Detecting Location)'
+        : currentLang === 'en'
+        ? 'Detecting your location via GPS...'
+        : 'जीपीएस द्वारा आपके जिले का पता लगाया जा रहा है...'
+    );
+
+    try {
+      const res = await locationIntelligenceService.detectGpsLocation();
+      if (!res) {
+        onNotify('स्थान स्वतः प्राप्त नहीं हो सका। कृपया बोलकर या लिखकर बताएं।');
+        return;
+      }
+
+      setAnswers((prev) => ({
+        ...prev,
+        location: res.location,
+        locationAccuracy: res.accuracyLevel,
+        locationConfidence: res.confidenceScore,
+        locationAccuracyMeters: res.accuracyMeters,
+      }));
+      profileRef.current = {
+        ...profileRef.current,
+        location: res.location,
+        locationAccuracy: res.accuracyLevel,
+        locationConfidence: res.confidenceScore,
+        locationAccuracyMeters: res.accuracyMeters,
+      };
+
+      onNotify(`📍 ${res.location} (${res.accuracyLevel} · ${res.confidenceScore}%)`);
+
+      const ackText =
+        currentLang === 'bho'
+          ? `स्थान मिल गइल: ${res.district}। बहुत बढ़िया!`
+          : currentLang === 'en'
+          ? `Location detected: ${res.district}. Great!`
+          : `स्थान मिल गया: ${res.district}। बहुत बढ़िया!`;
+
+      speechService.stopSpeaking();
+      speechService.stopListening();
+
+      const nextStepIdx = currentStepIndex + 1;
+      if (nextStepIdx < STEPS.length) {
+        setConversationState('asking_question');
+        setCurrentStepIndex(nextStepIdx);
+        const nextPrompt = `${ackText} ${getStepQuestionText(nextStepIdx)}`;
+        speechService.speak(nextPrompt, currentLang, () => {
+          if (inputMode === 'voice') {
+            setTimeout(() => startListeningForStep(nextStepIdx), 300);
+          } else {
+            setConversationState('asking_question');
+          }
+        });
+      } else {
+        setCurrentStepIndex(8);
+        activeStepRef.current = 8;
+        setConversationState('readback_review');
+        initiateReadbackSummary();
+      }
+    } catch (err) {
+      console.warn('GPS detection failed:', err);
+      onNotify('स्थान स्वतः प्राप्त नहीं हो सका। कृपया बोलकर या लिखकर बताएं।');
+    } finally {
+      setIsDetectingGps(false);
+    }
+  };
+
+  // Quick district selection handler
+  const handleSelectQuickDistrict = (districtName: string, stateName: string) => {
+    const fullLoc = `${districtName}, ${stateName}`;
+    const acc = locationIntelligenceService.setManualDistrict(districtName, stateName);
+
+    setAnswers((prev) => ({
+      ...prev,
+      location: fullLoc,
+      locationAccuracy: acc.level,
+      locationConfidence: acc.confidenceScore,
+      locationAccuracyMeters: acc.accuracyMeters,
+    }));
+    profileRef.current = {
+      ...profileRef.current,
+      location: fullLoc,
+      locationAccuracy: acc.level,
+      locationConfidence: acc.confidenceScore,
+      locationAccuracyMeters: acc.accuracyMeters,
+    };
+
+    onNotify(`📍 चुना गया जिला: ${fullLoc}`);
+
+    speechService.stopSpeaking();
+    speechService.stopListening();
+
+    const ackText =
+      currentLang === 'bho'
+        ? `${districtName} जिला नोट हो गइल।`
+        : currentLang === 'en'
+        ? `District ${districtName} noted.`
+        : `${districtName} जिला नोट कर लिया गया है।`;
+
+    const nextStepIdx = currentStepIndex + 1;
+    if (nextStepIdx < STEPS.length) {
+      setConversationState('asking_question');
+      setCurrentStepIndex(nextStepIdx);
+      const nextPrompt = `${ackText} ${getStepQuestionText(nextStepIdx)}`;
+      speechService.speak(nextPrompt, currentLang, () => {
+        if (inputMode === 'voice') {
+          setTimeout(() => startListeningForStep(nextStepIdx), 300);
+        } else {
+          setConversationState('asking_question');
+        }
+      });
     } else {
       setCurrentStepIndex(8);
       activeStepRef.current = 8;
@@ -1080,43 +1204,106 @@ export const Assessment: React.FC<AssessmentProps> = ({
               )}
 
               {currentStepConfig.key === 'location' && (
-                <div className="pt-2">
+                <div className="pt-2 space-y-3">
+                  {/* Official GPS Detection Button */}
                   <button
-                    onClick={() => {
-                      if (!navigator.geolocation) {
-                        onNotify('Geolocation not supported');
-                        return;
-                      }
-                      onNotify('Detecting your current location...');
-                      navigator.geolocation.getCurrentPosition(
-                        async (pos) => {
-                          const { latitude, longitude } = pos.coords;
-                          try {
-                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-                            const data = await res.json();
-                            const addr = data.address || {};
-                            const dist = addr.state_district || addr.county || addr.city || addr.town || addr.village || addr.state || '';
-                            const st = addr.state || '';
-                            const locStr = dist && st ? `${dist}, ${st}` : dist || st || `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
-                            setAnswers((prev) => ({ ...prev, location: locStr }));
-                            profileRef.current = { ...profileRef.current, location: locStr };
-                            onNotify(`Location detected: ${locStr}`);
-                          } catch (e) {
-                            const coordStr = `Lat: ${latitude.toFixed(2)}, Lon: ${longitude.toFixed(2)}`;
-                            setAnswers((prev) => ({ ...prev, location: coordStr }));
-                            profileRef.current = { ...profileRef.current, location: coordStr };
-                            onNotify('Coordinates fetched successfully.');
-                          }
-                        },
-                        () => onNotify('Unable to retrieve location. Please type manually.'),
-                        { timeout: 10000 }
-                      );
-                    }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-[#245A91]/10 border border-[#245A91]/30 text-[#245A91] font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#245A91]/20 transition-all"
+                    onClick={handleDetectLocationGps}
+                    disabled={isDetectingGps}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#245A91] to-[#17365D] hover:from-[#17365D] hover:to-[#245A91] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-sm active:scale-98 transition-all disabled:opacity-75"
                   >
-                    <Icon name="map" size={15} />
-                    <span>📍 मेरी वर्तमान लोकेशन स्वतः लें (Auto-Detect Location)</span>
+                    {isDetectingGps ? (
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Icon name="target" size={17} className="text-[#38BDF8]" />
+                    )}
+                    <span>
+                      {isDetectingGps
+                        ? currentLang === 'bho'
+                          ? 'जीपीएस से स्थान खोजल जा रहल बा...'
+                          : 'जीपीएस द्वारा स्थान पता किया जा रहा है...'
+                        : currentLang === 'bho'
+                        ? '📍 वर्तमान GPS स्थान स्वतः लें (Auto-Detect Location)'
+                        : '📍 वर्तमान GPS स्थान स्वतः लें (Auto-Detect Location)'}
+                    </span>
                   </button>
+
+                  {/* Selected / Detected Location Confirmation Pill */}
+                  {answers.location && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                        <span className="text-[#17365D] font-bold">
+                          📍 {answers.location}
+                        </span>
+                        {answers.locationAccuracy && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-emerald-800 border border-emerald-200">
+                            {answers.locationAccuracy}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const nextStepIdx = currentStepIndex + 1;
+                          if (nextStepIdx < STEPS.length) {
+                            askQuestionAloud(nextStepIdx);
+                          } else {
+                            setCurrentStepIndex(8);
+                            activeStepRef.current = 8;
+                            setConversationState('readback_review');
+                            initiateReadbackSummary();
+                          }
+                        }}
+                        className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-[11px] shadow-xs"
+                      >
+                        आगे बढ़ें (Next) →
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Popular District Quick Chips */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="text-[11px] font-bold text-[#5F6B76] uppercase tracking-wider flex items-center gap-1.5">
+                      <Icon name="map" size={12} className="text-[#245A91]" />
+                      <span>
+                        {currentLang === 'bho'
+                          ? 'या सीधा आपन जिला चुनीं (Quick Districts):'
+                          : 'या सीधा अपना जिला चुनें (Quick Districts):'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { name: 'Maharajganj', hi: 'महराजगंज', state: 'Uttar Pradesh' },
+                        { name: 'Gorakhpur', hi: 'गोरखपुर', state: 'Uttar Pradesh' },
+                        { name: 'Patna', hi: 'पटना', state: 'Bihar' },
+                        { name: 'Varanasi', hi: 'वाराणसी', state: 'Uttar Pradesh' },
+                        { name: 'Lucknow', hi: 'लखनऊ', state: 'Uttar Pradesh' },
+                        { name: 'Deoria', hi: 'देवरिया', state: 'Uttar Pradesh' },
+                        { name: 'Kushinagar', hi: 'कुशीनगर', state: 'Uttar Pradesh' },
+                        { name: 'Basti', hi: 'बस्ती', state: 'Uttar Pradesh' },
+                        { name: 'Prayagraj', hi: 'प्रयागराज', state: 'Uttar Pradesh' },
+                        { name: 'Gaya', hi: 'गया', state: 'Bihar' },
+                        { name: 'Muzaffarpur', hi: 'मुजफ्फरपुर', state: 'Bihar' },
+                        { name: 'Ranchi', hi: 'राँची', state: 'Jharkhand' },
+                      ].map((item) => {
+                        const isPicked = (answers.location || '').includes(item.name);
+                        return (
+                          <button
+                            key={item.name}
+                            type="button"
+                            onClick={() => handleSelectQuickDistrict(item.name, item.state)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                              isPicked
+                                ? 'bg-[#245A91] text-white border-[#245A91] shadow-xs font-bold'
+                                : 'bg-[#F5F7FA] text-[#17365D] border-[#DCE3EA] hover:border-[#245A91] hover:bg-white'
+                            }`}
+                          >
+                            {isPicked ? '✓ ' : ''}
+                            {item.hi} ({item.name})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

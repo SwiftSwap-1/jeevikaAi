@@ -151,19 +151,24 @@ export function rankPaths(prof: BeneficiaryProfile): EvaluatedPathway[] {
   return PATHWAYS.map((p) => evaluatePathway(p, prof)).sort((a, b) => b.score - a.score);
 }
 
-export function rankJobs(prof: BeneficiaryProfile, ranked: EvaluatedPathway[]): Opportunity[] {
+export function rankJobs(
+  prof: BeneficiaryProfile,
+  ranked: EvaluatedPathway[],
+  sourceJobs?: Opportunity[]
+): Opportunity[] {
+  const jobList = sourceJobs && sourceJobs.length > 0 ? sourceJobs : JOBS;
   const sc = Object.fromEntries(ranked.map((p) => [p.id, p.score]));
-  const lim = REACH_KM[mobKey(prof.mobility)];
-  return JOBS.map((j) => ({
+  const lim = REACH_KM[mobKey(prof.mobility)] ?? 50;
+  return jobList.map((j) => ({
     ...j,
-    score: sc[j.path] || 0,
-    inRange: j.km <= lim
+    score: j.score ?? sc[j.path] ?? 50,
+    inRange: typeof j.km === 'number' ? j.km <= lim : true
   })).sort((a, b) => {
     const rangeDiff = (b.inRange ? 1 : 0) - (a.inRange ? 1 : 0);
     if (rangeDiff !== 0) return rangeDiff;
     const scoreDiff = (b.score || 0) - (a.score || 0);
     if (scoreDiff !== 0) return scoreDiff;
-    return a.km - b.km;
+    return (a.km ?? 0) - (b.km ?? 0);
   });
 }
 

@@ -1,9 +1,32 @@
-import { Opportunity, GovernmentScheme, LocationInsight, LocationLivelihoodData, SupportedLanguage, BeneficiaryProfile } from '../types';
+import {
+  Opportunity,
+  GovernmentScheme,
+  LocationInsight,
+  LocationLivelihoodData,
+  SupportedLanguage,
+  BeneficiaryProfile,
+  LocationAccuracyLevel,
+  LocationAccuracyInfo,
+} from '../types';
 import { JOBS } from '../data/mockData';
 
 // Storage key for caching current location livelihood data
 const LOCATION_DATA_CACHE_KEY = 'jeevika_location_livelihood_cache_v2';
 const ACTIVE_LOCATION_KEY = 'jeevika_active_location_v2';
+const ACCURACY_STORAGE_KEY = 'jeevika_location_accuracy_v2';
+
+export interface LocationDetectionResult {
+  location: string;
+  district: string;
+  state: string;
+  accuracyLevel: LocationAccuracyLevel;
+  confidenceScore: number;
+  accuracyMeters?: number;
+  locality?: string;
+  pincode?: string;
+  source: 'gps' | 'manual' | 'cache' | 'default';
+  description: string;
+}
 
 export interface IndianStateDistricts {
   state: string;
@@ -529,6 +552,7 @@ const CURATED_DISTRICT_DATABASE: Record<string, Partial<LocationLivelihoodData>>
 class LocationIntelligenceService {
   private activeLocation: string = 'Maharajganj, Uttar Pradesh';
   private cachedData: LocationLivelihoodData | null = null;
+  private currentAccuracy: LocationAccuracyInfo | null = null;
   private listeners: ((data: LocationLivelihoodData) => void)[] = [];
 
   constructor() {
@@ -545,6 +569,10 @@ class LocationIntelligenceService {
       if (cached) {
         this.cachedData = JSON.parse(cached);
       }
+      const savedAcc = localStorage.getItem(ACCURACY_STORAGE_KEY);
+      if (savedAcc) {
+        this.currentAccuracy = JSON.parse(savedAcc);
+      }
     } catch {
       // Ignore
     }
@@ -554,14 +582,58 @@ class LocationIntelligenceService {
     return this.activeLocation;
   }
 
-  public setActiveLocation(loc: string): void {
+  public setActiveLocation(loc: string, accuracyInfo?: LocationAccuracyInfo): void {
     if (!loc || !loc.trim()) return;
     this.activeLocation = loc.trim();
     try {
       localStorage.setItem(ACTIVE_LOCATION_KEY, this.activeLocation);
+      if (accuracyInfo) {
+        this.currentAccuracy = accuracyInfo;
+        localStorage.setItem(ACCURACY_STORAGE_KEY, JSON.stringify(accuracyInfo));
+      }
     } catch {
       // Ignore
     }
+  }
+
+  public getLocationAccuracy(): LocationAccuracyInfo {
+    if (this.currentAccuracy) return this.currentAccuracy;
+    try {
+      const saved = localStorage.getItem(ACCURACY_STORAGE_KEY);
+      if (saved) {
+        this.currentAccuracy = JSON.parse(saved);
+        return this.currentAccuracy!;
+      }
+    } catch {
+      // Ignore
+    }
+    return {
+      level: 'District-level',
+      confidenceScore: 85,
+      source: 'default',
+      description: 'जिला स्तर मानक परिशुद्धता (District-level standard)'
+    };
+  }
+
+  public setLocationAccuracy(info: LocationAccuracyInfo): void {
+    this.currentAccuracy = info;
+    try {
+      localStorage.setItem(ACCURACY_STORAGE_KEY, JSON.stringify(info));
+    } catch {
+      // Ignore
+    }
+  }
+
+  public setManualDistrict(districtName: string, stateName: string): LocationAccuracyInfo {
+    const fullLoc = `${districtName}, ${stateName}`;
+    const info: LocationAccuracyInfo = {
+      level: 'District-level',
+      confidenceScore: 88,
+      source: 'manual',
+      description: `मैनुअल चयन: ${districtName} (${stateName})`
+    };
+    this.setActiveLocation(fullLoc, info);
+    return info;
   }
 
   public getCachedData(): LocationLivelihoodData | null {
@@ -634,12 +706,16 @@ class LocationIntelligenceService {
       if (res.ok) {
         const payload = await res.json();
         if (payload && payload.result && !payload.fallback) {
+          const accuracy = this.getLocationAccuracy();
           const liveData: LocationLivelihoodData = {
             location: loc,
             district: payload.result.district || district,
             state: payload.result.state || state,
             isAiGenerated: true,
             timestamp: new Date().toISOString(),
+            accuracyLevel: accuracy.level,
+            confidenceScore: accuracy.confidenceScore,
+            accuracyMeters: accuracy.accuracyMeters,
             insight: payload.result.insight || this.getDefaultInsight(district, state),
             opportunities: payload.result.opportunities || [],
             trainingCenters: payload.result.trainingCenters || [],
@@ -676,6 +752,7 @@ class LocationIntelligenceService {
   private buildFallbackData(loc: string, district: string, state: string): LocationLivelihoodData {
     const key = district.toLowerCase().trim();
     const curated = CURATED_DISTRICT_DATABASE[key];
+    const accuracy = this.getLocationAccuracy();
 
     if (curated) {
       return {
@@ -684,6 +761,9 @@ class LocationIntelligenceService {
         state: curated.state || state,
         isAiGenerated: false,
         timestamp: new Date().toISOString(),
+        accuracyLevel: accuracy.level,
+        confidenceScore: accuracy.confidenceScore,
+        accuracyMeters: accuracy.accuracyMeters,
         insight: curated.insight || this.getDefaultInsight(district, state),
         opportunities: curated.opportunities || [],
         trainingCenters: curated.trainingCenters || [],
@@ -841,9 +921,10 @@ class LocationIntelligenceService {
   }
 
   /**
-   * Browser GPS Detection with reverse geocoding
+   * Browser GPS Detection with high-precision reverse geocoding,
+   * confidence scoring and accuracy level identification.
    */
-  public async detectGpsLocation(): Promise<{ location: string; district: string; state: string } | null> {
+  public async detectGpsLocation(): Promise<LocationDetectionResult | null> {
     if (typeof window === 'undefined' || !navigator.geolocation) {
       throw new Error('Geolocation is not supported by your browser');
     }
@@ -852,34 +933,111 @@ class LocationIntelligenceService {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
-            const { latitude, longitude } = position.coords;
+            const { latitude, longitude, accuracy } = position.coords;
+            const accuracyMeters = Math.round(accuracy || 45);
 
-            // Fast OpenStreetMap reverse geocoding
-            const res = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`,
-              { headers: { 'Accept': 'application/json' } }
-            );
-
-            if (res.ok) {
-              const data = await res.json();
-              const addr = data.address || {};
-              const district = addr.state_district || addr.county || addr.city || addr.town || 'Gorakhpur';
-              const cleanDistrict = district.replace(/district/i, '').trim();
-              const state = addr.state || 'Uttar Pradesh';
-              const fullLoc = `${cleanDistrict}, ${state}`;
-
-              this.setActiveLocation(fullLoc);
-              resolve({ location: fullLoc, district: cleanDistrict, state });
-              return;
+            // Fast OpenStreetMap reverse geocoding with zoom=14 for neighborhood/village accuracy
+            let addr: any = {};
+            let isGeocoded = false;
+            try {
+              const res = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`,
+                { headers: { 'Accept': 'application/json' } }
+              );
+              if (res.ok) {
+                const data = await res.json();
+                addr = data.address || {};
+                isGeocoded = true;
+              }
+            } catch {
+              // Nominatim fetch failed or throttled
             }
-          } catch {
-            // Reverse geocode failed, approximate fallback
+
+            const rawDistrict = addr.state_district || addr.county || addr.city || addr.town || addr.municipality;
+            const locality = addr.village || addr.suburb || addr.neighbourhood || addr.residential || addr.hamlet || addr.road;
+            const pincode = addr.postcode;
+            const state = addr.state || 'Uttar Pradesh';
+
+            let cleanDistrict = rawDistrict ? rawDistrict.replace(/district/i, '').trim() : '';
+
+            // Fallback district if address was vague
+            if (!cleanDistrict) {
+              const current = this.getActiveLocation();
+              const [d] = current.split(',').map((x) => x.trim());
+              cleanDistrict = d || 'Gorakhpur';
+            }
+
+            const fullLoc = `${cleanDistrict}, ${state}`;
+
+            // Calculate confidence score and precision category
+            let accuracyLevel: LocationAccuracyLevel = 'District-level';
+            let confidenceScore = 85;
+            let description = '';
+
+            if (accuracyMeters <= 150 || (locality && accuracyMeters <= 600)) {
+              accuracyLevel = 'Precise';
+              // 90% - 98% confidence
+              confidenceScore = Math.max(90, Math.min(98, Math.round(100 - accuracyMeters / 25)));
+              description = `सटीक जीपीएस स्थान (±${accuracyMeters}m)${locality ? ` · ${locality}` : ''}`;
+            } else if (accuracyMeters <= 8000 && isGeocoded) {
+              accuracyLevel = 'District-level';
+              // 78% - 88% confidence
+              confidenceScore = Math.max(78, Math.min(88, Math.round(90 - (accuracyMeters - 150) / 500)));
+              description = `जिला प्रशासनिक दायरा (±${Math.round(accuracyMeters / 1000)}km) · ${cleanDistrict}`;
+            } else {
+              accuracyLevel = 'State-level';
+              confidenceScore = isGeocoded ? 65 : 55;
+              description = `राज्य स्तर अनुमान (State-level) · ${state}`;
+            }
+
+            const accuracyInfo: LocationAccuracyInfo = {
+              level: accuracyLevel,
+              confidenceScore,
+              accuracyMeters,
+              locality,
+              pincode,
+              source: 'gps',
+              description,
+            };
+
+            this.setActiveLocation(fullLoc, accuracyInfo);
+
+            const result: LocationDetectionResult = {
+              location: fullLoc,
+              district: cleanDistrict,
+              state,
+              accuracyLevel,
+              confidenceScore,
+              accuracyMeters,
+              locality,
+              pincode,
+              source: 'gps',
+              description,
+            };
+
+            resolve(result);
+            return;
+          } catch (err) {
+            console.warn('Geolocation parsing failed:', err);
           }
 
           // Fallback to active location if reverse geocoding throttled
           const current = this.getActiveLocation();
-          const [d, s] = current.split(',').map(x => x.trim());
-          resolve({ location: current, district: d || 'Maharajganj', state: s || 'Uttar Pradesh' });
+          const [d, s] = current.split(',').map((x) => x.trim());
+          const districtFallback = d || 'Maharajganj';
+          const stateFallback = s || 'Uttar Pradesh';
+          const defaultAccuracy = this.getLocationAccuracy();
+
+          resolve({
+            location: current,
+            district: districtFallback,
+            state: stateFallback,
+            accuracyLevel: defaultAccuracy.level,
+            confidenceScore: defaultAccuracy.confidenceScore,
+            accuracyMeters: defaultAccuracy.accuracyMeters,
+            source: 'cache',
+            description: defaultAccuracy.description || 'कैश्ड स्थान',
+          });
         },
         (error) => {
           reject(error);

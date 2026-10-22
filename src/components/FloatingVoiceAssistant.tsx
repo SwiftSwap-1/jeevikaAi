@@ -5,6 +5,8 @@ import { SupportedLanguage, AppView, BeneficiaryProfile } from '../types';
 import { speechService, SpeechRecognitionResultWrapper } from '../services/speechService';
 import { processLocalAssistantQuery } from '../services/aiAssistantEngine';
 import { voiceVocabularyCache, CachedVocabularyItem } from '../services/voiceVocabularyCache';
+import { locationIntelligenceService } from '../services/locationIntelligenceService';
+import { LocationAccuracyBadge } from './LocationAccuracyBadge';
 
 interface FloatingVoiceAssistantProps {
   currentView: AppView;
@@ -567,12 +569,18 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
           </div>
 
           {/* Active Location & AI Status Banner */}
-          <div className="px-3 py-1.5 bg-[#EBF3FB] border-b border-[#DCE3EA] flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-1.5 font-bold text-[#17365D]">
-              <span className="text-amber-600">📍</span>
-              <span className="truncate max-w-[200px]">
+          <div className="px-3 py-1.5 bg-[#EBF3FB] border-b border-[#DCE3EA] flex items-center justify-between text-[11px] flex-wrap gap-1">
+            <div className="flex items-center gap-1.5 font-bold text-[#17365D] min-w-0">
+              <span className="text-amber-600 flex-shrink-0">📍</span>
+              <span className="truncate max-w-[150px] sm:max-w-[190px]">
                 {activeLocation || profile?.location || 'Maharajganj, Uttar Pradesh'}
               </span>
+              <LocationAccuracyBadge
+                level={locationIntelligenceService.getLocationAccuracy().level}
+                confidenceScore={locationIntelligenceService.getLocationAccuracy().confidenceScore}
+                currentLang={currentLang}
+                className="flex-shrink-0"
+              />
             </div>
 
             {isAiThinking ? (

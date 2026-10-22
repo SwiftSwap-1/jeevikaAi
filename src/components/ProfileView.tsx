@@ -4,6 +4,8 @@ import { BeneficiaryProfile, SupportedLanguage } from '../types';
 import { EDU, WORK, MOB, SKILL_CHIPS, INTEREST_CHIPS } from '../data/mockData';
 import { splitList } from '../services/recommendationEngine';
 import { speechService, SpeechRecognitionResultWrapper } from '../services/speechService';
+import { locationIntelligenceService } from '../services/locationIntelligenceService';
+import { LocationAccuracyBadge } from './LocationAccuracyBadge';
 
 interface ProfileViewProps {
   profile: BeneficiaryProfile;
@@ -27,6 +29,40 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [isListeningVoice, setIsListeningVoice] = useState<boolean>(false);
   const [voiceLiveTranscript, setVoiceLiveTranscript] = useState<string>('');
   const [voiceStatusText, setVoiceStatusText] = useState<string>('');
+  const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
+
+  const handleGpsDetect = async () => {
+    if (isDetectingGps) return;
+    setIsDetectingGps(true);
+    onNotify(
+      currentLang === 'bho'
+        ? 'जीपीएस से स्थान खोजल जा रहल बा...'
+        : 'जीपीएस द्वारा स्थान पहचाना जा रहा है...'
+    );
+    try {
+      const res = await locationIntelligenceService.detectGpsLocation();
+      if (res && res.location) {
+        const updated = {
+          ...form,
+          location: res.location,
+          locationAccuracy: res.accuracyLevel,
+          locationConfidence: res.confidenceScore,
+          locationAccuracyMeters: res.accuracyMeters,
+        };
+        setForm(updated);
+        onUpdateProfile(updated);
+        onNotify(
+          currentLang === 'bho'
+            ? `स्थान मिल गइल: ${res.location} (${res.accuracyLevel} · ${res.confidenceScore}%)`
+            : `स्थान प्राप्त हुआ: ${res.location} (${res.accuracyLevel} · ${res.confidenceScore}% विश्वास)`
+        );
+      }
+    } catch {
+      onNotify('स्थान का पता नहीं चल सका। कृपया मैन्युअली लिखें।');
+    } finally {
+      setIsDetectingGps(false);
+    }
+  };
 
   const handleChange = (k: keyof BeneficiaryProfile, v: any) => {
     const updated = { ...form, [k]: v };
@@ -319,18 +355,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <label className="block text-xs font-bold text-[#5F6B76]">
                 District / Town (जिला या कस्बा)
               </label>
-              <button
-                type="button"
-                onClick={() => startVoiceUpdate('location', 'अपना जिला या शहर बोलिए')}
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors ${
-                  activeVoiceField === 'location'
-                    ? 'bg-red-500 text-white animate-pulse'
-                    : 'bg-[#245A91]/10 text-[#245A91] hover:bg-[#245A91]/20'
-                }`}
-              >
-                <Icon name="mic" size={12} />
-                <span>AI से बोलें</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleGpsDetect}
+                  disabled={isDetectingGps}
+                  className="text-[11px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                  title="फोन के जीपीएस से सटीक स्थान पहचानें"
+                >
+                  <Icon name={isDetectingGps ? 'refresh' : 'target'} size={12} className={isDetectingGps ? 'animate-spin' : ''} />
+                  <span>{isDetectingGps ? 'खोज रहे हैं...' : 'GPS पहचानें'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startVoiceUpdate('location', 'अपना जिला या शहर बोलिए')}
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors ${
+                    activeVoiceField === 'location'
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : 'bg-[#245A91]/10 text-[#245A91] hover:bg-[#245A91]/20'
+                  }`}
+                >
+                  <Icon name="mic" size={12} />
+                  <span>AI से बोलें</span>
+                </button>
+              </div>
             </div>
             <input
               type="text"
@@ -339,6 +387,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               onChange={(e) => handleChange('location', e.target.value)}
               className="w-full p-3 rounded-xl border border-[#DCE3EA] text-sm focus:outline-none focus:border-[#245A91]"
             />
+            {form.location && (
+              <div className="pt-1 flex items-center gap-2">
+                <span className="text-[11px] text-[#5F6B76] font-medium">सटीकता स्तर (Accuracy):</span>
+                <LocationAccuracyBadge
+                  level={form.locationAccuracy || 'District-level'}
+                  confidenceScore={form.locationConfidence || 85}
+                  accuracyMeters={form.locationAccuracyMeters}
+                  currentLang={currentLang}
+                  onReDetect={handleGpsDetect}
+                  isDetecting={isDetectingGps}
+                />
+              </div>
+            )}
           </div>
         </div>
 
