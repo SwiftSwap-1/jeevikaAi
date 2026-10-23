@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <title>JeevikaAI - Voice-First Livelihood & Skill Guidance</title>
+    <meta name="description" content="Multilingual voice-first livelihood and NSQF-aligned skill guidance platform for first-time digital users in Hindi, Bhojpuri, and English." />
+    <meta property="og:title" content="JeevikaAI - Voice-First Livelihood & Skill Guidance" />
+    <meta property="og:description" content="Multilingual voice-first livelihood and NSQF-aligned skill guidance platform for first-time digital users in Hindi, Bhojpuri, and English." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/icons/icon-512.svg" />
+    <meta name="theme-color" content="#17365D" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="JeevikaAI" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#FFFFFF] text-[#202B36] min-h-screen font-['Hind',system-ui,sans-serif]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Service worker registration
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch((err) => {
+            console.log('SW registration notice:', err.message);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

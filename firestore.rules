@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Super Administrator helper rule
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'ayushgupt640@gmail.com' ||
+        request.auth.token.role == 'admin'
+      );
+    }
+
+    // User profile documents: User owner or Super Admin can read, write, or delete
+    match /users/{userId} {
+      allow read, write, delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+    }
+
+    // Assessment submissions and user skill analytics
+    match /assessments/{assessmentId} {
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin();
+    }
+
+    // Public Opportunities and Job Directory: Read-only for public, full CRUD for admin
+    match /opportunities/{opportunityId} {
+      allow read: if true;
+      allow write, create, update, delete: if isAdmin();
+    }
+
+    // NSQF Skill Pathways
+    match /pathways/{pathwayId} {
+      allow read: if true;
+      allow write, create, update, delete: if isAdmin();
+    }
+
+    // Training Centers and PMKVY / RSETI Providers
+    match /training_centers/{centerId} {
+      allow read: if true;
+      allow write, create, update, delete: if isAdmin();
+    }
+
+    // System Statistics & Location Intelligence
+    match /analytics/{docId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#17365D"/>
+  <g transform="translate(64, 64) scale(0.75)">
+    <!-- Map Pin & Microphone -->
+    <path d="M202 437C202 437 64 298 64 192A138 138 0 0 1 340 192c0 106-138 245-138 245Z" fill="#245A91"/>
+    <circle cx="202" cy="192" r="90" fill="#FFFFFF"/>
+    <rect x="181" y="130" width="42" height="80" rx="21" fill="#17365D"/>
+    <path d="M157 190a45 45 0 0 0 90 0" stroke="#17365D" stroke-width="14" stroke-linecap="round"/>
+    <path d="M202 235v22" stroke="#17365D" stroke-width="14" stroke-linecap="round"/>
+    <!-- Skill Tree Nodes -->
+    <path d="M325 128l101-37 32 138-74 117M458 229l-122 27" stroke="#287D73" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="426" cy="91" r="32" fill="#D9822B"/>
+    <circle cx="458" cy="229" r="27" fill="#287D73"/>
+    <circle cx="383" cy="346" r="24" fill="#287D73"/>
+  </g>
+</svg>
