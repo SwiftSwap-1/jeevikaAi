@@ -360,14 +360,18 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     voiceVocabularyCache.addPhrase(queryText, 'navigation', currentLang);
     setCachedVocabList(voiceVocabularyCache.getAll());
 
-    // Always attempt live AI call to Gemini / Cloudflare Worker / backend proxy!
-    setIsAiThinking(true);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // Direct Fast-Track for Hands-Free Voice Navigation (Instant 0ms response for low-literacy users)
+    const isDirectNav = Boolean(localResult.targetView && !localResult.isCardReadout && !localResult.profileUpdates);
 
-      const targetLocation = activeLocation || profile?.location || 'Maharajganj, Uttar Pradesh';
-      const endpoint = customWorkerUrl.trim() || '/api/chat';
+    if (!isDirectNav) {
+      // Attempt live AI call to Gemini / Cloudflare Worker / backend proxy for questions or card explanations
+      setIsAiThinking(true);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const targetLocation = activeLocation || profile?.location || 'Maharajganj, Uttar Pradesh';
+        const endpoint = customWorkerUrl.trim() || '/api/chat';
 
       let response: Response | null = null;
       try {
@@ -487,6 +491,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     } finally {
       setIsAiThinking(false);
     }
+  }
 
     setAiMessage(finalReply);
     setChatHistory((prev) => [...prev, { sender: 'ai', text: finalReply }]);
@@ -795,8 +800,43 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
 
           {/* Voice Record & Keyboard Input Footer */}
           <div className="p-3 bg-white border-t border-[#DCE3EA] space-y-2">
-            {/* Quick Interactive Card Reading & Cached Vocabulary Chips */}
+            {/* Hands-Free Voice Guidance Banner for Low-Literacy Users */}
+            <div className="bg-[#245A91]/10 border border-[#245A91]/20 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-[11px] text-[#17365D]">
+              <div className="flex items-center gap-1.5 font-bold">
+                <span className="text-sm">🗣️</span>
+                <span>
+                  {currentLang === 'en'
+                    ? 'Hands-Free: Say "Go to dashboard" or "Open settings"'
+                    : currentLang === 'bho'
+                    ? 'बोलल जाव: "डैशबोर्ड खोलीं" या "सेटिंग्स खोलीं"'
+                    : 'बोलिए: "डैशबोर्ड खोलो" या "ओपन सेटिंग्स"'}
+                </span>
+              </div>
+              <span className="text-[10px] bg-[#245A91] text-white px-2 py-0.5 rounded-full font-extrabold">
+                वॉइस नेविगेशन
+              </span>
+            </div>
+
+            {/* Quick Interactive Card Reading & Hands-Free Navigation Chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-semibold no-scrollbar">
+              <button
+                type="button"
+                onClick={() => processUserQuery(currentLang === 'en' ? 'go to dashboard' : 'डैशबोर्ड खोलो')}
+                className="px-2.5 py-1 rounded-lg bg-[#17365D] text-white hover:bg-[#245A91] whitespace-nowrap flex items-center gap-1 transition-colors shadow-2xs font-bold"
+                title="डैशबोर्ड पर जाएँ (Go to Dashboard)"
+              >
+                <span>📊</span>
+                <span>{currentLang === 'en' ? 'Go to Dashboard' : 'डैशबोर्ड खोलो'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => processUserQuery(currentLang === 'en' ? 'open settings' : 'सेटिंग्स खोलो')}
+                className="px-2.5 py-1 rounded-lg bg-[#5F6B76]/10 text-[#17365D] hover:bg-[#5F6B76]/20 whitespace-nowrap border border-[#DCE3EA] flex items-center gap-1 transition-colors font-bold"
+                title="सेटिंग्स खोलें (Open Settings)"
+              >
+                <span>⚙️</span>
+                <span>{currentLang === 'en' ? 'Open Settings' : 'सेटिंग्स'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => processUserQuery(currentLang === 'en' ? 'Read Roadmap Card' : 'रोडमैप कार्ड पढ़ के बताओ')}
@@ -804,7 +844,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 title="रोडमैप कार्ड बोलकर सुनें"
               >
                 <span>🗺️</span>
-                <span>{currentLang === 'en' ? 'Read Roadmap' : 'रोडमैप कार्ड पढ़ो'}</span>
+                <span>{currentLang === 'en' ? 'Read Roadmap' : 'रोडमैप कार्ड'}</span>
               </button>
               <button
                 type="button"
@@ -813,16 +853,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 title="पास की नौकरियों के कार्ड सुनें"
               >
                 <span>💼</span>
-                <span>{currentLang === 'en' ? 'Read Jobs' : 'नौकरी कार्ड बताओ'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => processUserQuery(currentLang === 'en' ? 'Read Skill Gap Card' : 'कौशल (Skills) कार्ड पढ़ो')}
-                className="px-2.5 py-1 rounded-lg bg-[#D9822B]/10 text-[#D9822B] hover:bg-[#D9822B]/20 whitespace-nowrap border border-[#D9822B]/20 flex items-center gap-1 transition-colors"
-                title="कौशल अंतर कार्ड सुनें"
-              >
-                <span>⚡</span>
-                <span>{currentLang === 'en' ? 'Read Skills' : 'कौशल कार्ड'}</span>
+                <span>{currentLang === 'en' ? 'Read Jobs' : 'नौकरियां'}</span>
               </button>
               <button
                 type="button"
@@ -831,16 +862,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 title="प्रशिक्षण केंद्र कार्ड सुनें"
               >
                 <span>🎓</span>
-                <span>{currentLang === 'en' ? 'Training Centers' : 'प्रशिक्षण केंद्र'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => processUserQuery(currentLang === 'en' ? 'Government Schemes' : 'सरकारी योजना कार्ड बताओ')}
-                className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 whitespace-nowrap border border-amber-200 flex items-center gap-1 transition-colors"
-                title="सरकारी योजनाएँ सुनें"
-              >
-                <span>🏛️</span>
-                <span>{currentLang === 'en' ? 'Schemes' : 'योजना कार्ड'}</span>
+                <span>{currentLang === 'en' ? 'Training Centers' : 'प्रशिक्षण'}</span>
               </button>
               <button
                 type="button"
@@ -850,6 +872,15 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
               >
                 <span>👤</span>
                 <span>{currentLang === 'en' ? 'Profile' : 'प्रोफ़ाइल'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => processUserQuery(currentLang === 'en' ? 'go home' : 'होम पेज पर जाओ')}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 whitespace-nowrap border border-slate-200 flex items-center gap-1 transition-colors"
+                title="होम पेज खोलें"
+              >
+                <span>🏠</span>
+                <span>{currentLang === 'en' ? 'Home' : 'होम'}</span>
               </button>
             </div>
 

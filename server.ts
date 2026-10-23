@@ -319,6 +319,16 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         navTarget = 'home';
         reply = 'मुख्य पृष्ठ खोला जा रहा है जहाँ से आप नया मूल्यांकन शुरू कर सकते हैं।';
       }
+      // 11. Settings navigation
+      else if (lower.includes('setting') || lower.includes('seting') || lower.includes('सेटिंग') || lower.includes('alert') || lower.includes('notification')) {
+        navTarget = 'notifications';
+        reply = 'ऐप सेटिंग्स और सूचना प्राथमिकताएं खोली जा रही हैं। (Opening Settings)';
+      }
+      // 12. Assessment navigation
+      else if (lower.includes('assessment') || lower.includes('मूल्यांकन') || lower.includes('test')) {
+        navTarget = 'assessment';
+        reply = 'आवाज़ द्वारा आजीविका मूल्यांकन शुरू किया जा रहा है। (Starting Assessment)';
+      }
 
       return res.json({
         fallback: true,
@@ -363,7 +373,9 @@ Your Instructions:
    - "Training / Kendra Card" / "ट्रेनिंग": Read PMKVY, RSETI, or ITI centers with free benefits. Target: "training".
    - "Yojana Card" / "योजना": Read PM Vishwakarma, Mudra, or State Udyami scheme grants and loan limits. Target: "faq".
 3. Dynamic Navigation:
-   - Allowed targetView values: "home", "dashboard", "opportunities", "training", "skill-gap", "saved", "profile", "faq", "history", null.
+   - Allowed targetView values: "home", "dashboard", "opportunities", "training", "skill-gap", "saved", "profile", "faq", "history", "notifications", "assessment", null.
+   - If user asks to go to dashboard or roadmap ("go to dashboard", "open dashboard", "dashboard") -> "dashboard".
+   - If user asks for settings ("open settings", "go to settings", "settings") -> "notifications".
 4. Location or Profile Updates:
    - If the user mentions their location/district (e.g. "main Patna se hoon", "Gorakhpur mein kaam chahiye", "mera zila Varanasi hai"), extract "location" into "profileUpdates" (e.g. "Patna, Bihar", "Gorakhpur, Uttar Pradesh", "Varanasi, Uttar Pradesh").
    - If the user mentions name, education, or skills, extract them into "profileUpdates".
@@ -373,7 +385,7 @@ Your Instructions:
 Return strictly JSON with NO markdown codeblocks:
 {
   "reply": "Warm spoken reply in user's language",
-  "targetView": "opportunities" | "training" | "dashboard" | "skill-gap" | "saved" | "profile" | "faq" | "home" | null,
+  "targetView": "opportunities" | "training" | "dashboard" | "skill-gap" | "saved" | "profile" | "faq" | "home" | "notifications" | "assessment" | null,
   "actionHighlight": "opportunities-section" | "roadmap-section" | "training-section" | null,
   "profileUpdates": {
     "location": "District, State if mentioned",

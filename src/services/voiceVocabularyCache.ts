@@ -55,10 +55,22 @@ export const DEFAULT_VOICE_VOCABULARY: CachedVocabularyItem[] = [
     synonyms: ['सेव की हुई नौकरी', 'शॉर्टलिस्ट दिखाओ', 'saved jobs', 'show saved', 'bookmarks']
   },
   {
+    phrase: 'डैशबोर्ड खोलो',
+    category: 'navigation',
+    lang: 'hi',
+    synonyms: ['डैशबोर्ड पर जाओ', 'डैशबोर्ड दिखाओ', 'go to dashboard', 'open dashboard', 'dashboard', 'take me to dashboard', 'dashboard par jao']
+  },
+  {
+    phrase: 'सेटिंग्स खोलो',
+    category: 'navigation',
+    lang: 'hi',
+    synonyms: ['सेटिंग्स पर जाओ', 'सेटिंग्स दिखाओ', 'अलर्ट सेटिंग्स', 'open settings', 'go to settings', 'settings', 'notification settings', 'settings kholo']
+  },
+  {
     phrase: 'सहायता एवं सवाल',
     category: 'navigation',
     lang: 'hi',
-    synonyms: ['मदद करो', 'एफएक्यू खोलो', 'help dikhao', 'open faq', 'support']
+    synonyms: ['मदद करो', 'एफएक्यू खोलो', 'help dikhao', 'open faq', 'support', 'open help', 'go to help']
   },
 
   // 2. Card Reading Commands

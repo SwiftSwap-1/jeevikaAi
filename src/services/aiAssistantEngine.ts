@@ -453,27 +453,38 @@ export function processLocalAssistantQuery(
   }
 
   // -------------------------------------------------------------------------
-  // 8. PAGE NAVIGATION INTENTS (हिंदी और अंग्रेजी में नेविगेशन)
+  // 8. PAGE NAVIGATION INTENTS (Hands-Free Voice Navigation for Low-Literacy)
   // -------------------------------------------------------------------------
+  // Dashboard / Roadmap Navigation
   if (
+    query.includes('open dashboard') ||
+    query.includes('go to dashboard') ||
+    query.includes('show dashboard') ||
     query.includes('open roadmap') ||
     query.includes('go to roadmap') ||
     query.includes('show roadmap') ||
-    query.includes('open dashboard') ||
-    query.includes('go to dashboard') ||
-    query.includes('रोडमैप दिखाओ') ||
-    query.includes('रोडमैप खोलो') ||
+    query.includes('take me to dashboard') ||
+    query === 'dashboard' ||
+    query === 'roadmap' ||
     query.includes('डैशबोर्ड खोलो') ||
     query.includes('डैशबोर्ड पर जाओ') ||
+    query.includes('डैशबोर्ड दिखाओ') ||
+    query.includes('डैशबोर्ड') ||
+    query.includes('रोडमैप दिखाओ') ||
+    query.includes('रोडमैप खोलो') ||
+    query.includes('रोडमैप पर जाओ') ||
     query.includes('roadmap par jao') ||
     query.includes('roadmap kholo') ||
-    query.includes('roadmap dikhao')
+    query.includes('roadmap dikhao') ||
+    query.includes('dashboard kholo') ||
+    query.includes('dashboard par jao') ||
+    query.includes('dashboard dikhao')
   ) {
     const text = isEnglish
-      ? 'Opening your personalized livelihood roadmap on the dashboard now.'
+      ? 'Opening your dashboard and livelihood roadmap now.'
       : isBhojpuri
-      ? 'रउआ खातिर डैशबोर्ड पर व्यक्तिगत रोडमैप खोलल जा रहल बा।'
-      : 'जी, आपका व्यक्तिगत आजीविका रोडमैप खोला जा रहा है।';
+      ? 'रउआ खातिर डैशबोर्ड अउर व्यक्तिगत रोडमैप खोलल जा रहल बा।'
+      : 'जी, आपका डैशबोर्ड और व्यक्तिगत आजीविका रोडमैप खोला जा रहा है।';
     return {
       reply: text,
       spokenReply: text,
@@ -483,13 +494,61 @@ export function processLocalAssistantQuery(
     };
   }
 
+  // Settings & Notifications Navigation
+  if (
+    query.includes('open settings') ||
+    query.includes('go to settings') ||
+    query.includes('show settings') ||
+    query.includes('open setting') ||
+    query.includes('go to setting') ||
+    query === 'settings' ||
+    query === 'setting' ||
+    query === 'setings' ||
+    query === 'seting' ||
+    query.includes('सेटिंग्स खोलो') ||
+    query.includes('सेटिंग्स पर जाओ') ||
+    query.includes('सेटिंग्स दिखाओ') ||
+    query.includes('सेटिंग खोलो') ||
+    query.includes('सेटिंग्स') ||
+    query.includes('सेटिंग') ||
+    query.includes('notification') ||
+    query.includes('notifications') ||
+    query.includes('अलर्ट') ||
+    query.includes('सूचना') ||
+    query.includes('alert settings') ||
+    query.includes('settings kholo') ||
+    query.includes('settings par jao') ||
+    query.includes('setting kholo')
+  ) {
+    const text = isEnglish
+      ? 'Opening settings and notification preferences.'
+      : isBhojpuri
+      ? 'रउआ खातिर ऐप सेटिंग्स अउर सूचना प्राथमिकता पेज खोलल जा रहल बा।'
+      : 'जी, ऐप सेटिंग्स और सूचना प्राथमिकताएं खोली जा रही हैं।';
+    return {
+      reply: text,
+      spokenReply: text,
+      targetView: 'notifications',
+      isCardReadout: false,
+    };
+  }
+
+  // Jobs / Livelihood Opportunities Navigation
   if (
     query.includes('open jobs') ||
+    query.includes('go to jobs') ||
     query.includes('show jobs') ||
     query.includes('find jobs') ||
     query.includes('open opportunities') ||
+    query.includes('go to opportunities') ||
+    query === 'jobs' ||
+    query === 'job' ||
+    query === 'naukri' ||
+    query === 'नौकरी' ||
+    query === 'रोजगार' ||
     query.includes('नौकरी दिखाओ') ||
     query.includes('नौकरी खोलो') ||
+    query.includes('नौकरी पर जाओ') ||
     query.includes('रोजगार दिखाओ') ||
     query.includes('काम दिखाओ') ||
     query.includes('naukri dikhao') ||
@@ -510,11 +569,18 @@ export function processLocalAssistantQuery(
     };
   }
 
+  // Training Centers Navigation
   if (
     query.includes('open training') ||
+    query.includes('go to training') ||
     query.includes('show training') ||
     query.includes('training centers') ||
+    query.includes('vocational training') ||
+    query === 'training' ||
+    query === 'ट्रेनिंग' ||
+    query === 'प्रशिक्षण' ||
     query.includes('प्रशिक्षण केंद्र दिखाओ') ||
+    query.includes('प्रशिक्षण केंद्र खोलो') ||
     query.includes('ट्रेनिंग खोलो') ||
     query.includes('कौशल केंद्र दिखाओ') ||
     query.includes('training kholo') ||
@@ -533,11 +599,16 @@ export function processLocalAssistantQuery(
     };
   }
 
+  // Profile Navigation
   if (
     query.includes('open profile') ||
+    query.includes('go to profile') ||
     query.includes('show profile') ||
     query.includes('edit profile') ||
     query.includes('my profile') ||
+    query === 'profile' ||
+    query === 'प्रोफाइल' ||
+    query === 'प्रोफ़ाइल' ||
     query.includes('प्रोफ़ाइल खोलो') ||
     query.includes('प्रोफाइल दिखाओ') ||
     query.includes('मेरी जानकारी') ||
@@ -557,24 +628,23 @@ export function processLocalAssistantQuery(
     };
   }
 
+  // Home / Assessment Navigation
   if (
     query.includes('go home') ||
+    query.includes('open home') ||
+    query.includes('go to home') ||
     query.includes('home page') ||
-    query.includes('start assessment') ||
-    query.includes('retake assessment') ||
-    query.includes('start over') ||
+    query === 'home' ||
+    query === 'होम' ||
     query.includes('होम पेज पर जाओ') ||
     query.includes('मुख्य पृष्ठ') ||
-    query.includes('शुरू से शुरू करो') ||
-    query.includes('मूल्यांकन शुरू करो') ||
-    query.includes('home par jao') ||
-    query.includes('shuru se shuru')
+    query.includes('home par jao')
   ) {
     const text = isEnglish
-      ? 'Navigating to the home page where you can start a new voice assessment.'
+      ? 'Navigating to the home page.'
       : isBhojpuri
-      ? 'मुख्य पृष्ठ पर ले जाइल जा रहल बा जहाँ से रउआ नया आवाज़ मूल्यांकन शुरू कर सकेनी।'
-      : 'जी, मुख्य पृष्ठ खोला जा रहा है जहाँ से आप नया आवाज़ मूल्यांकन शुरू कर सकते हैं।';
+      ? 'मुख्य पृष्ठ पर ले जाइल जा रहल बा।'
+      : 'जी, मुख्य पृष्ठ खोला जा रहा है।';
     return {
       reply: text,
       spokenReply: text,
@@ -583,7 +653,38 @@ export function processLocalAssistantQuery(
     };
   }
 
+  // Voice Assessment Start
   if (
+    query.includes('start assessment') ||
+    query.includes('take assessment') ||
+    query.includes('open assessment') ||
+    query.includes('voice assessment') ||
+    query.includes('retake assessment') ||
+    query.includes('start over') ||
+    query.includes('मूल्यांकन शुरू करो') ||
+    query.includes('नया टेस्ट') ||
+    query.includes('शुरू से शुरू करो') ||
+    query.includes('shuru se shuru') ||
+    query.includes('assessment kholo')
+  ) {
+    const text = isEnglish
+      ? 'Starting your voice livelihood assessment now.'
+      : isBhojpuri
+      ? 'आवाज से आजीविका मूल्यांकन शुरू कइल जा रहल बा।'
+      : 'जी, आवाज़ द्वारा आजीविका मूल्यांकन शुरू किया जा रहा है।';
+    return {
+      reply: text,
+      spokenReply: text,
+      targetView: 'assessment',
+      isCardReadout: false,
+    };
+  }
+
+  // Saved / Bookmarks Navigation
+  if (
+    query.includes('open saved') ||
+    query.includes('go to saved') ||
+    query.includes('show saved') ||
     query.includes('saved') ||
     query.includes('shortlist') ||
     query.includes('bookmarks') ||
@@ -602,7 +703,11 @@ export function processLocalAssistantQuery(
     };
   }
 
+  // Help & FAQ Navigation
   if (
+    query.includes('open help') ||
+    query.includes('go to help') ||
+    query.includes('show help') ||
     query.includes('help') ||
     query.includes('faq') ||
     query.includes('support') ||
@@ -622,7 +727,11 @@ export function processLocalAssistantQuery(
     };
   }
 
+  // Assessment History Navigation
   if (
+    query.includes('open history') ||
+    query.includes('go to history') ||
+    query.includes('show history') ||
     query.includes('history') ||
     query.includes('इतिहास') ||
     query.includes('purana record') ||
@@ -635,24 +744,6 @@ export function processLocalAssistantQuery(
       reply: text,
       spokenReply: text,
       targetView: 'history',
-      isCardReadout: false,
-    };
-  }
-
-  if (
-    query.includes('notification') ||
-    query.includes('notifications') ||
-    query.includes('अलर्ट') ||
-    query.includes('सूचना') ||
-    query.includes('alert settings')
-  ) {
-    const text = isEnglish
-      ? 'Opening notification and alert preferences.'
-      : 'जी, सूचना और अलर्ट सेटिंग्स खोली जा रही हैं।';
-    return {
-      reply: text,
-      spokenReply: text,
-      targetView: 'notifications',
       isCardReadout: false,
     };
   }
