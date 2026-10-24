@@ -1248,7 +1248,7 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
                 Cloudinary Media Uploader &amp; CMS (क्लाउडिनरी मीडिया प्रबंधक)
               </h3>
               <p className="text-xs text-[#5F6B76]">
-                Upload banner slides, training gallery visuals, or showcase product images using Cloudinary (`kvyah2au`, preset `jeevikaai`).
+                Upload banner slides, training gallery visuals, or showcase product images using secure cloud storage.
               </p>
             </div>
 
@@ -1308,7 +1308,7 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
               {mediaUploading && (
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] font-bold text-[#287D73]">
-                    <span>Uploading to Cloudinary (kvyah2au)...</span>
+                    <span>Uploading to secure cloud storage...</span>
                     <span>{mediaUploadProgress}%</span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">

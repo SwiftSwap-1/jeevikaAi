@@ -255,7 +255,7 @@ export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
                         className="w-full text-xs text-slate-600 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#17365D] file:text-white hover:file:bg-[#245A91] cursor-pointer"
                       />
                       <p className="text-[11px] text-[#5F6B76] mt-1.5">
-                        Cloudinary (kvyah2au) पर सुरक्षित रूप से संपीड़ित व संग्रहीत।
+                        क्लाउड स्टोरेज पर सुरक्षित रूप से संपीड़ित व संग्रहीत।
                       </p>
                     </div>
                   </div>
