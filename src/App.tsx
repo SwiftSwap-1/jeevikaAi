@@ -34,13 +34,7 @@ export default function App() {
     typeof window !== 'undefined' &&
     (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true);
 
-  const [currentView, setCurrentView] = useState<AppView>(() => {
-    const hasProfile = Boolean(storageService.loadProfile());
-    if (hasProfile || isStandalone) {
-      return hasProfile ? 'dashboard' : 'assessment';
-    }
-    return 'home';
-  });
+  const [currentView, setCurrentView] = useState<AppView>('home');
   const [currentLang, setCurrentLang] = useState<SupportedLanguage>(() => {
     try {
       return (localStorage.getItem('jeevika_lang') as SupportedLanguage) || 'hi';
@@ -54,10 +48,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string>('');
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [summaryModalData, setSummaryModalData] = useState<SummaryModalData | null>(null);
-  const [autoStartAssessment, setAutoStartAssessment] = useState<boolean>(() => {
-    const hasProfile = Boolean(storageService.loadProfile());
-    return Boolean(isStandalone && !hasProfile);
-  });
+  const [autoStartAssessment, setAutoStartAssessment] = useState<boolean>(false);
   const [showVoiceStartModal, setShowVoiceStartModal] = useState<boolean>(false);
   const [adminLoginModalOpen, setAdminLoginModalOpen] = useState<boolean>(false);
   const [accountMode, setAccountMode] = useState<AccountMode | null>(null);
@@ -517,6 +508,7 @@ export default function App() {
             onStartVoiceAssessment={handleStartVoiceAssessment}
             onOpenAccount={setAccountMode}
             currentLang={currentLang}
+            hasProfile={Boolean(profile)}
           />
         )}
 

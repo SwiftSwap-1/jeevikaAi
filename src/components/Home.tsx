@@ -12,6 +12,7 @@ interface HomeProps {
   onStartVoiceAssessment?: (lang: SupportedLanguage) => void;
   onOpenAccount?: (mode: 'create' | 'login') => void;
   currentLang?: SupportedLanguage;
+  hasProfile?: boolean;
 }
 
 export const Home: React.FC<HomeProps> = ({
@@ -20,6 +21,7 @@ export const Home: React.FC<HomeProps> = ({
   onStartVoiceAssessment,
   onOpenAccount,
   currentLang = 'hi',
+  hasProfile = false,
 }) => {
   const [showVoiceModal, setShowVoiceModal] = useState<boolean>(false);
   const previewPaths = PATHWAYS.map((p) => evaluatePathway(p, DEMO)).sort((a, b) => b.score - a.score);
@@ -102,6 +104,16 @@ export const Home: React.FC<HomeProps> = ({
                   <Icon name="mic" size={18} />
                   <span>Start Voice Assessment (बोलकर शुरू करें)</span>
                 </button>
+
+                {hasProfile && (
+                  <button
+                    onClick={() => go('dashboard')}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-[#287D73] hover:bg-[#1E6058] text-white font-bold text-sm shadow-md transition-all active:scale-95"
+                  >
+                    <Icon name="route" size={18} />
+                    <span>मेरा रोडमैप देखें (View My Roadmap)</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => go('opportunities')}
