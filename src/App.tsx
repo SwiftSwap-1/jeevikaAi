@@ -519,7 +519,7 @@ export default function App() {
       )}
 
       {/* Primary Route Views */}
-      <div className="flex-1 pt-16 sm:pt-20 pb-20 sm:pb-24">
+      <div className={`flex-1 ${isStandalone && !profile ? 'pt-0' : 'pt-16 sm:pt-20'} pb-20 sm:pb-24`}>
         {currentView === 'home' && (
           isStandalone && !profile ? (
             <AppWelcome
