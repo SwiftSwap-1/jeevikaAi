@@ -15,10 +15,10 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
   onLoadDemo,
 }) => {
   return (
-    <div className="relative min-h-[82vh] flex flex-col items-center justify-center px-4 py-10 bg-gradient-to-b from-white via-slate-50 to-[#F5F7FA]">
+    <div className="fixed inset-0 z-40 bg-[#F5F7FA] flex flex-col items-center justify-center p-4 overflow-hidden">
       <div className="gov-tricolor-line absolute top-0 left-0 right-0" />
       
-      <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#DCE3EA] text-center space-y-5 animate-fade-in my-auto">
+      <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-[#DCE3EA] text-center space-y-5 my-auto">
         {/* Centered Platform Logo */}
         <div className="mx-auto flex flex-col items-center space-y-3">
           <div className="w-20 h-20 rounded-2xl bg-[#17365D] text-white flex items-center justify-center shadow-lg border-2 border-[#245A91]">
@@ -56,9 +56,9 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
           {/* Login Button */}
           <button
             onClick={() => onOpenAccount('login')}
-            className="w-full min-h-14 px-6 rounded-2xl bg-[#245A91] hover:bg-[#17365D] text-white text-base font-extrabold shadow-md transition-all active:scale-98 flex items-center justify-center gap-2.5"
+            className="w-full min-h-14 px-6 rounded-2xl bg-[#17365D] hover:bg-[#245A91] text-white text-base font-extrabold shadow-md transition-all active:scale-98 flex items-center justify-center gap-2.5"
           >
-            <Icon name="logout" size={20} />
+            <Icon name="arrowR" size={20} />
             <span>
               {currentLang === 'bho' ? 'लॉगिन करीं (Log In)' : 'लॉगिन करें (Log In)'}
             </span>
