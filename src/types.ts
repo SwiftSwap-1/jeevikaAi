@@ -60,6 +60,8 @@ export interface ShowcaseProduct {
   location: string;
   contactPhone?: string;
   createdAt: string;
+  userId?: string;
+  viewsCount?: number;
 }
 
 export interface MediaAssetRecord {
