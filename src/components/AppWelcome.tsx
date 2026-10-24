@@ -17,10 +17,10 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
   onLoadDemo,
 }) => {
   return (
-    <div className="min-h-[85vh] flex flex-col items-center justify-center px-4 py-8 bg-gradient-to-b from-white via-slate-50 to-[#F5F7FA]">
+    <div className="relative min-h-[82vh] flex flex-col items-center justify-center px-4 py-10 bg-gradient-to-b from-white via-slate-50 to-[#F5F7FA]">
       <div className="gov-tricolor-line absolute top-0 left-0 right-0" />
       
-      <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl border border-[#DCE3EA] text-center space-y-6 animate-fade-in">
+      <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#DCE3EA] text-center space-y-5 animate-fade-in my-auto">
         {/* Centered Platform Logo */}
         <div className="mx-auto flex flex-col items-center space-y-3">
           <div className="w-20 h-20 rounded-2xl bg-[#17365D] text-white flex items-center justify-center shadow-lg border-2 border-[#245A91]">
