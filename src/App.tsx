@@ -668,6 +668,16 @@ export default function App() {
 
         {currentView === 'business-upload' && (
           <LocalBusinessUpload
+            currentUser={currentUser}
+            onOpenAccount={setAccountMode}
+            onOpenGoogleLogin={async () => {
+              try {
+                await authService.loginWithGoogle();
+                notify('सफलतापूर्वक गूगल लॉगिन हो गया!');
+              } catch (err: any) {
+                notify('लॉगिन विफल: ' + err.message);
+              }
+            }}
             onNotify={notify}
             go={navigateTo}
             userName={profile?.name}

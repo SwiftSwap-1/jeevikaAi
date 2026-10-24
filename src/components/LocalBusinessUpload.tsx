@@ -2,10 +2,15 @@ import React, { useState } from 'react';
 import { Icon } from './Icons';
 import { uploadToCloudinary, mediaStorageService } from '../services/cloudinaryService';
 import { AppView } from '../types';
+import { AppUser } from '../services/firebase';
+import { AccountMode } from './AssistedAccountModal';
 
 interface LocalBusinessUploadProps {
   onNotify: (msg: string) => void;
   go: (view: AppView | string) => void;
+  currentUser?: AppUser | null;
+  onOpenAccount?: (mode: AccountMode) => void;
+  onOpenGoogleLogin?: () => void;
   userName?: string;
   userPhone?: string;
   userLocation?: string;
@@ -15,18 +20,23 @@ interface LocalBusinessUploadProps {
 export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
   onNotify,
   go,
+  currentUser,
+  onOpenAccount,
+  onOpenGoogleLogin,
   userName = '',
   userPhone = '',
   userLocation = '',
   onClose,
 }) => {
+  const isLogged = Boolean(currentUser && !currentUser.isAnonymous);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('हस्तशिल्प व कपड़े');
-  const [artisanName, setArtisanName] = useState(userName);
+  const [artisanName, setArtisanName] = useState(currentUser?.displayName || userName || '');
   const [location, setLocation] = useState(userLocation || 'महाराजगंज, उत्तर प्रदेश');
-  const [contactPhone, setContactPhone] = useState(userPhone);
+  const [contactPhone, setContactPhone] = useState(currentUser?.phone || userPhone || '');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [uploading, setUploading] = useState<boolean>(false);
@@ -42,6 +52,10 @@ export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLogged) {
+      onNotify('उत्पाद प्रकाशित करने के लिए कृपया पहले लॉगिन करें।');
+      return;
+    }
     if (!title.trim() || !artisanName.trim()) {
       onNotify('कृपया उत्पाद का नाम और कारीगर/विक्रेता का नाम दर्ज करें।');
       return;
@@ -91,7 +105,7 @@ export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#287D73]/10 text-[#287D73] mb-1">
               <Icon name="check" size={13} />
-              <span>Cloudinary + Firestore Integration</span>
+              <span>Seller Portal · स्थानीय विक्रेता पोर्टल</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-[#17365D]">
               + अपना उत्पाद जोड़ें (Local Business Upload)
@@ -109,6 +123,62 @@ export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
             </button>
           )}
         </div>
+
+        {/* Login Status Banner */}
+        {!isLogged ? (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 space-y-3 text-center">
+            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-800 mx-auto flex items-center justify-center font-bold">
+              <Icon name="lock" size={24} />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-[#17365D] text-sm">
+                उत्पाद अपलोड करने के लिए लॉगिन आवश्यक है (Login Required)
+              </h3>
+              <p className="text-xs text-[#5F6B76] mt-1">
+                सुरक्षित रूप से अपना उत्पाद प्रदर्शित करने के लिए कृपया अपने गूगल या मोबाइल खाते से लॉगिन करें।
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              {onOpenGoogleLogin && (
+                <button
+                  type="button"
+                  onClick={onOpenGoogleLogin}
+                  className="flex-1 py-2.5 rounded-xl bg-[#17365D] hover:bg-[#245A91] text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2"
+                >
+                  <Icon name="user" size={14} />
+                  <span>🔐 Google से लॉगिन करें</span>
+                </button>
+              )}
+              {onOpenAccount && (
+                <button
+                  type="button"
+                  onClick={() => onOpenAccount('login')}
+                  className="flex-1 py-2.5 rounded-xl bg-[#287D73] hover:bg-[#1E6058] text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2"
+                >
+                  <Icon name="mic" size={14} />
+                  <span>📱 मोबाइल नंबर से लॉगिन</span>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-3.5 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold">
+                ✓
+              </div>
+              <div>
+                <div className="font-bold text-emerald-900">
+                  Logined as: {currentUser?.displayName || currentUser?.email || 'Seller'}
+                </div>
+                <div className="text-[10px] text-emerald-700">आप प्रमाणित विक्रेता के रूप में लॉग इन हैं।</div>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-200 text-emerald-900">
+              Active Session
+            </span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {/* Image Upload Box with Cloudinary preview */}
@@ -249,10 +319,10 @@ export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
             </button>
             <button
               type="submit"
-              disabled={uploading}
+              disabled={uploading || !isLogged}
               className="flex-1 py-3.5 rounded-xl bg-[#287D73] hover:bg-[#1E6058] text-white font-extrabold shadow-md transition-all active:scale-95 disabled:opacity-50"
             >
-              {uploading ? 'प्रकाशित हो रहा है...' : '🚀 उत्पाद प्रकाशित करें'}
+              {uploading ? 'प्रकाशित हो रहा है...' : !isLogged ? '🔐 पहले लॉगिन करें' : '🚀 उत्पाद प्रकाशित करें'}
             </button>
           </div>
         </form>
