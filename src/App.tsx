@@ -523,6 +523,7 @@ export default function App() {
             userName={profile?.name}
             userPhone={profile?.phone}
             userLocation={profile?.location}
+            currentUser={currentUser}
           />
         )}
 
