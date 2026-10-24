@@ -264,7 +264,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               title="लॉगआउट / नया प्रोफ़ाइल बनाएं"
             >
               <Icon name="logout" size={14} />
-              <span>🚪 लॉगआउट (Logout)</span>
+              <span>लॉगआउट (Logout)</span>
             </button>
           )}
 

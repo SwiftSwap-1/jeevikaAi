@@ -367,7 +367,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }}
                     className="px-3 py-1.5 rounded-xl text-xs font-extrabold text-white bg-[#9E2A2B] hover:bg-[#7E1F20] transition-colors shadow-sm flex items-center gap-1.5 flex-shrink-0 active:scale-95"
                   >
-                    <span>🚪 लॉगआउट</span>
+                    <Icon name="logout" size={14} />
+                    <span>लॉगआउट</span>
                   </button>
                 </div>
               </div>
