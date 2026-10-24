@@ -228,7 +228,8 @@ export type AppView =
   | 'about'
   | 'settings'
   | 'admin'
-  | 'login';
+  | 'login'
+  | 'business-upload';
 
 export interface SummaryModalData {
   text: string;

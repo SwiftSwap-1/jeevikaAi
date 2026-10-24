@@ -21,6 +21,7 @@ import { SummaryModal } from './components/SummaryModal';
 import { VoiceStartModal } from './components/VoiceStartModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AssistedAccountModal, AccountMode } from './components/AssistedAccountModal';
+import { LocalBusinessUpload } from './components/LocalBusinessUpload';
 
 import { FloatingVoiceAssistant } from './components/FloatingVoiceAssistant';
 import { BeneficiaryProfile, SupportedLanguage, AppView, Opportunity, SummaryModalData, LocationLivelihoodData } from './types';
@@ -662,6 +663,17 @@ export default function App() {
             go={navigateTo}
             onOpenLogin={() => setAdminLoginModalOpen(true)}
             onLogout={handleLogout}
+          />
+        )}
+
+        {currentView === 'business-upload' && (
+          <LocalBusinessUpload
+            onNotify={notify}
+            go={navigateTo}
+            userName={profile?.name}
+            userPhone={profile?.phone}
+            userLocation={profile?.location}
+            onClose={() => navigateTo('home')}
           />
         )}
       </div>
