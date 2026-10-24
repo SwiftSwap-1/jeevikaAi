@@ -23,6 +23,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { AssistedAccountModal, AccountMode } from './components/AssistedAccountModal';
 import { LocalBusinessUpload } from './components/LocalBusinessUpload';
 import { SellerAnalytics } from './components/SellerAnalytics';
+import { AppWelcome } from './components/AppWelcome';
 
 import { FloatingVoiceAssistant } from './components/FloatingVoiceAssistant';
 import { BeneficiaryProfile, SupportedLanguage, AppView, Opportunity, SummaryModalData, LocationLivelihoodData } from './types';
@@ -36,7 +37,15 @@ export default function App() {
     typeof window !== 'undefined' &&
     (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true);
 
-  const [currentView, setCurrentView] = useState<AppView>('home');
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    try {
+      const savedProf = storageService.loadProfile();
+      if (isStandalone && savedProf) {
+        return 'dashboard';
+      }
+    } catch {}
+    return 'home';
+  });
   const [currentLang, setCurrentLang] = useState<SupportedLanguage>(() => {
     try {
       return (localStorage.getItem('jeevika_lang') as SupportedLanguage) || 'hi';
@@ -512,18 +521,34 @@ export default function App() {
       {/* Primary Route Views */}
       <div className="flex-1 pt-16 sm:pt-20 pb-20 sm:pb-24">
         {currentView === 'home' && (
-          <Home
-            go={navigateTo}
-            onLoadDemo={handleLoadDemoBeneficiary}
-            onStartVoiceAssessment={handleStartVoiceAssessment}
-            onOpenAccount={setAccountMode}
-            currentLang={currentLang}
-            hasProfile={Boolean(profile)}
-            onNotify={notify}
-            userName={profile?.name}
-            userPhone={profile?.phone}
-            userLocation={profile?.location}
-          />
+          isStandalone && !profile ? (
+            <AppWelcome
+              currentLang={currentLang}
+              onOpenAccount={setAccountMode}
+              onStartVoice={() => {
+                if (!currentUser || currentUser.isAnonymous) {
+                  setAccountMode('create');
+                } else {
+                  setAutoStartAssessment(true);
+                  setCurrentView('assessment');
+                }
+              }}
+              onLoadDemo={handleLoadDemoBeneficiary}
+            />
+          ) : (
+            <Home
+              go={navigateTo}
+              onLoadDemo={handleLoadDemoBeneficiary}
+              onStartVoiceAssessment={handleStartVoiceAssessment}
+              onOpenAccount={setAccountMode}
+              currentLang={currentLang}
+              hasProfile={Boolean(profile)}
+              onNotify={notify}
+              userName={profile?.name}
+              userPhone={profile?.phone}
+              userLocation={profile?.location}
+            />
+          )
         )}
 
         {currentView === 'assessment' && (

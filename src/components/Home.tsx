@@ -7,7 +7,6 @@ import { PWAInstallStatusButton } from './PWAInstallStatusButton';
 import { HeroCarousel } from './HeroCarousel';
 import { SkillTrainingGallery } from './SkillTrainingGallery';
 import { LocalBusinessShowcase } from './LocalBusinessShowcase';
-import { AppWelcome } from './AppWelcome';
 
 interface HomeProps {
   go: (view: AppView, sectionId?: string) => void;
@@ -71,16 +70,7 @@ export const Home: React.FC<HomeProps> = ({
 
   return (
     <main>
-      {!hasProfile && onOpenAccount ? (
-        <AppWelcome
-          currentLang={currentLang}
-          onOpenAccount={onOpenAccount}
-          onStartVoice={handleStartVoice}
-          onLoadDemo={onLoadDemo}
-        />
-      ) : (
-        <>
-          {/* Civic White & Navy Hero Section */}
+      {/* Civic White & Navy Hero Section */}
       <section className="bg-white border-b border-[#DCE3EA] py-12 md:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -352,8 +342,6 @@ export const Home: React.FC<HomeProps> = ({
           </div>
         </div>
       </section>
-        </>
-      )}
     </main>
   );
 };
