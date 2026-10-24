@@ -243,11 +243,7 @@ export const AssistedAccountModal: React.FC<Props> = ({
         case 'phone':
           return mode === 'create' ? tx('phonePrompt', L) : tx('phoneLoginPrompt', L);
         case 'pin':
-          return (
-            (message ? `${message} ` : '') +
-            `${tx('yourNumber', L)}: ${spaced(phone)}. ` +
-            (mode === 'create' ? tx('pinPromptCreate', L) : tx('pinPromptLogin', L))
-          );
+          return mode === 'create' ? tx('pinPromptCreate', L) : tx('pinPromptLogin', L);
         case 'pin2':
           return tx('pin2Prompt', L);
         case 'forgot_phone':
@@ -259,10 +255,10 @@ export const AssistedAccountModal: React.FC<Props> = ({
         case 'busy':
           return mode === 'create' ? tx('busyCreate', L) : tx('busyLogin', L);
         default:
-          return message;
+          return '';
       }
     },
-    [L, mode, phone, message]
+    [L, mode]
   );
 
   useEffect(() => {
@@ -273,7 +269,7 @@ export const AssistedAccountModal: React.FC<Props> = ({
     return () => {
       speechService.stopSpeaking();
     };
-  }, [isOpen, step, mode, L, promptFor]);
+  }, [isOpen, step, mode, L]);
 
   useEffect(() => {
     if (!isOpen) {
