@@ -730,8 +730,8 @@ export default function App() {
         <BottomNav currentView={currentView} go={navigateTo} currentLang={currentLang} shortlistCount={Object.values(shortlist).filter(Boolean).length} />
       )}
 
-      {/* Floating AI Voice Assistant */}
-      {!showSplash && (
+      {/* Floating AI Voice Assistant - hidden on PWA welcome screen before profile creation */}
+      {!showSplash && !(isStandalone && !profile && currentView === 'home') && (
         <FloatingVoiceAssistant
           currentView={currentView}
           currentLang={currentLang}
