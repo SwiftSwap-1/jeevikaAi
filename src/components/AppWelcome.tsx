@@ -1,5 +1,5 @@
 import React from 'react';
-import { Logo } from './Logo';
+import { LogoMark } from './Logo';
 import { Icon } from './Icons';
 import { SupportedLanguage } from '../types';
 
@@ -18,15 +18,15 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
     <div className="fixed inset-0 z-40 bg-[#F5F7FA] flex flex-col items-center justify-center p-4 overflow-hidden">
       <div className="gov-tricolor-line absolute top-0 left-0 right-0" />
       
-      <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-[#DCE3EA] text-center space-y-6 my-auto">
-        {/* Centered Platform Logo */}
+      <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-[#DCE3EA] text-center space-y-5 my-auto">
+        {/* Centered App Icon Mark */}
         <div className="mx-auto flex flex-col items-center space-y-3">
           <div className="w-20 h-20 rounded-2xl bg-[#17365D] text-white flex items-center justify-center shadow-lg border-2 border-[#245A91]">
-            <Logo size={48} />
+            <LogoMark size={48} />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#17365D] tracking-tight font-['Bricolage_Grotesque']">
-              JeevikaAI
+            <h1 className="text-xl sm:text-2xl font-extrabold text-[#17365D] tracking-tight font-['Bricolage_Grotesque']">
+              Jeevika<span className="text-[#245A91]">AI</span>
             </h1>
             <p className="text-xs font-bold text-[#287D73] mt-0.5">
               ग्रामीण हुनर व आजीविका सहायक
