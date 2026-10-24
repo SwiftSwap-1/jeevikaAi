@@ -96,44 +96,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       )}
 
-      {/* Top National Civic Ribbon - Hidden in PWA standalone mode */}
-      {!isStandalone && (
-        <div className="bg-[#17365D] text-[#C9DAEC] text-[10px] sm:text-xs py-1.5 px-3 sm:px-6">
-          <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 truncate">
-              <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-[#D9822B] text-white flex-shrink-0">
-                Public Service
-              </span>
-              <span className="text-white/85 truncate font-medium">
-                Voice-First NSQF Livelihood &amp; Skill Guidance
-              </span>
-            </div>
 
-            <div className="flex items-center gap-2.5 text-[10px] sm:text-[11px] flex-shrink-0">
-              <button
-                onClick={() => handleNav('about')}
-                className="hover:underline font-semibold text-white/95"
-              >
-                About
-              </button>
-              <span className="opacity-40">|</span>
-              <button
-                onClick={() => handleNav('faq')}
-                className="hover:underline hidden xs:inline text-white/80"
-              >
-                Help &amp; FAQ
-              </button>
-              <span className="opacity-40 hidden xs:inline">|</span>
-              <button
-                onClick={() => handleNav('privacy')}
-                className="hover:underline hidden md:inline text-white/80"
-              >
-                Privacy
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main Navbar Bar */}
       <div className="bg-white/95 backdrop-blur-md border-b border-[#DCE3EA]">
@@ -152,19 +115,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               Home
-            </button>
-
-            <button
-              onClick={() => {
-                if (onStartVoiceAssessment) onStartVoiceAssessment();
-                else handleNav('assessment');
-              }}
-              className={`px-3 py-2 rounded-lg transition-colors hover:text-[#17365D] flex items-center gap-1.5 ${
-                currentView === 'assessment' ? 'text-[#245A91] font-extrabold' : ''
-              }`}
-            >
-              <Icon name="mic" size={13} className="text-[#245A91]" />
-              <span>Assessment</span>
             </button>
 
             <button
@@ -250,29 +200,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden xs:inline">Offline</span>
               </span>
             )}
-            {/* Primary Start Voice Assessment CTA Button */}
-            <button
-              onClick={() => {
-                if (onStartVoiceAssessment) {
-                  onStartVoiceAssessment();
-                } else {
-                  handleNav('assessment');
-                }
-              }}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-gradient-to-r from-[#245A91] to-[#17365D] hover:from-[#17365D] hover:to-[#0F233D] text-white text-xs font-extrabold shadow-sm hover:shadow-md transition-all active:scale-95 flex-shrink-0"
-              title="बोलकर आजीविका मूल्यांकन शुरू करें (Start Voice Assessment)"
-            >
-              <Icon name="mic" size={14} className="text-cyan-300 animate-pulse" />
-              <span className="hidden xs:inline">
-                {currentLang === 'bho'
-                  ? 'बोल के शुरू करीं'
-                  : currentLang === 'en'
-                  ? 'Voice Assessment'
-                  : 'बोलकर शुरू करें'}
-              </span>
-              <span className="xs:hidden text-[11px]">माइक</span>
-            </button>
-
             {/* Desktop PWA Install Button */}
             {canInstall && (
               <button
@@ -285,41 +212,43 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Language Switcher (Compact & fluid) */}
-            <div className="relative">
-              <button
-                onClick={() => setLangMenuOpen(!langMenuOpen)}
-                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-[#DCE3EA] bg-white text-[#202B36] hover:border-[#245A91] transition-colors"
-                aria-label="Change language"
-                title="भाषा बदलें (Change Language)"
-              >
-                <Icon name="globe" size={14} className="text-[#245A91]" />
-                <span className="font-bold text-[11px] sm:text-xs">{activeLangConfig.label}</span>
-                <Icon name="chev" size={11} className="text-[#5F6B76]" />
-              </button>
+            {/* Language Switcher - shown after profile creation or login for a clean initial landing experience */}
+            {(profileName || currentUser) && (
+              <div className="relative">
+                <button
+                  onClick={() => setLangMenuOpen(!langMenuOpen)}
+                  className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-[#DCE3EA] bg-white text-[#202B36] hover:border-[#245A91] transition-colors"
+                  aria-label="Change language"
+                  title="भाषा बदलें (Change Language)"
+                >
+                  <Icon name="globe" size={14} className="text-[#245A91]" />
+                  <span className="font-bold text-[11px] sm:text-xs">{activeLangConfig.label}</span>
+                  <Icon name="chev" size={11} className="text-[#5F6B76]" />
+                </button>
 
-              {langMenuOpen && (
-                <div className="absolute right-0 mt-1 w-44 bg-white border border-[#DCE3EA] rounded-xl shadow-xl py-1 z-50">
-                  {LANG_CONFIG.map((lang) => (
-                    <button
-                      key={lang.k}
-                      onClick={() => {
-                        onLanguageChange(lang.k as SupportedLanguage);
-                        setLangMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-[#F5F7FA] ${
-                        currentLang === lang.k
-                          ? 'font-bold text-[#245A91] bg-slate-50'
-                          : 'text-[#202B36]'
-                      }`}
-                    >
-                      <span>{lang.label}</span>
-                      <span className="text-[10px] text-[#5F6B76]">{lang.sub}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                {langMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-44 bg-white border border-[#DCE3EA] rounded-xl shadow-xl py-1 z-50">
+                    {LANG_CONFIG.map((lang) => (
+                      <button
+                        key={lang.k}
+                        onClick={() => {
+                          onLanguageChange(lang.k as SupportedLanguage);
+                          setLangMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-[#F5F7FA] ${
+                          currentLang === lang.k
+                            ? 'font-bold text-[#245A91] bg-slate-50'
+                            : 'text-[#202B36]'
+                        }`}
+                      >
+                        <span>{lang.label}</span>
+                        <span className="text-[10px] text-[#5F6B76]">{lang.sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Prominent Saved User Profile & Red Logout Button at Top */}
             {(profileName || currentUser) && (
@@ -400,7 +329,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Backdrop for Mobile Drawer */}
         {mobileMenuOpen && (
           <div
-            className="fixed inset-0 top-[calc(4rem+1.8rem)] z-40 bg-black/50 backdrop-blur-xs lg:hidden animate-fade-in"
+            className="fixed inset-0 top-16 z-40 bg-black/50 backdrop-blur-xs lg:hidden animate-fade-in"
             onClick={() => setMobileMenuOpen(false)}
             aria-hidden="true"
           />
