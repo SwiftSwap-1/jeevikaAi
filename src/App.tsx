@@ -509,6 +509,10 @@ export default function App() {
             onOpenAccount={setAccountMode}
             currentLang={currentLang}
             hasProfile={Boolean(profile)}
+            onNotify={notify}
+            userName={profile?.name}
+            userPhone={profile?.phone}
+            userLocation={profile?.location}
           />
         )}
 

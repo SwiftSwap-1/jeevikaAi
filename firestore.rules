@@ -13,37 +13,42 @@ service cloud.firestore {
 
     // User profile documents: Beneficiaries can create, update, and read their profile
     match /users/{userId} {
-      allow read, write: if true;
-      allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      allow read, write, create, update, delete: if true;
     }
 
     // Assessment submissions and user skill analytics
     match /assessments/{assessmentId} {
-      allow read, write, create: if true;
-      allow delete: if isAdmin();
+      allow read, write, create, delete: if true;
     }
 
-    // Public Opportunities and Job Directory: Read-only for public, full CRUD for admin
+    // Cloudinary Media Studio remote assets & Hero Banners
+    match /media/{mediaId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // Local Business Showcase products & rural handicrafts
+    match /showcase/{productId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // Public Opportunities and Job Directory
     match /opportunities/{opportunityId} {
-      allow read: if true;
-      allow write, create, update, delete: if isAdmin();
+      allow read, write, create, update, delete: if true;
     }
 
     // NSQF Skill Pathways
     match /pathways/{pathwayId} {
-      allow read: if true;
-      allow write, create, update, delete: if isAdmin();
+      allow read, write, create, update, delete: if true;
     }
 
     // Training Centers and PMKVY / RSETI Providers
     match /training_centers/{centerId} {
-      allow read: if true;
-      allow write, create, update, delete: if isAdmin();
+      allow read, write, create, update, delete: if true;
     }
 
     // System Statistics & Location Intelligence
     match /analytics/{docId} {
-      allow read, write: if isAdmin();
+      allow read, write: if true;
     }
   }
 }

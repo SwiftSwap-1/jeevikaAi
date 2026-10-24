@@ -36,6 +36,50 @@ export interface BeneficiaryProfile {
   latitude?: number;
   longitude?: number;
   phone?: string;
+  avatarUrl?: string;
+  portfolio?: SkillPortfolioItem[];
+}
+
+export interface SkillPortfolioItem {
+  id: string;
+  title: string;
+  imageUrl: string;
+  category: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface ShowcaseProduct {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  price?: string;
+  category: string;
+  artisanName: string;
+  location: string;
+  contactPhone?: string;
+  createdAt: string;
+}
+
+export interface MediaAssetRecord {
+  id: string;
+  url: string;
+  folder: string;
+  name: string;
+  tags: string[];
+  used: number;
+  time: number;
+  createdAt?: any;
+}
+
+export interface HeroSlide {
+  id: string;
+  imageUrl: string;
+  title: string;
+  subtitle: string;
+  tag: string;
+  linkView?: AppView;
 }
 
 export interface StepQuestion {

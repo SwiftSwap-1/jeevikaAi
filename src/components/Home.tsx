@@ -5,6 +5,9 @@ import { evaluatePathway, rankJobs } from '../services/recommendationEngine';
 import { AppView, SupportedLanguage } from '../types';
 import { PWAInstallStatusButton } from './PWAInstallStatusButton';
 import { VoiceStartModal } from './VoiceStartModal';
+import { HeroCarousel } from './HeroCarousel';
+import { SkillTrainingGallery } from './SkillTrainingGallery';
+import { LocalBusinessShowcase } from './LocalBusinessShowcase';
 
 interface HomeProps {
   go: (view: AppView, sectionId?: string) => void;
@@ -13,6 +16,10 @@ interface HomeProps {
   onOpenAccount?: (mode: 'create' | 'login') => void;
   currentLang?: SupportedLanguage;
   hasProfile?: boolean;
+  onNotify?: (msg: string) => void;
+  userName?: string;
+  userPhone?: string;
+  userLocation?: string;
 }
 
 export const Home: React.FC<HomeProps> = ({
@@ -22,6 +29,10 @@ export const Home: React.FC<HomeProps> = ({
   onOpenAccount,
   currentLang = 'hi',
   hasProfile = false,
+  onNotify = () => {},
+  userName,
+  userPhone,
+  userLocation,
 }) => {
   const [showVoiceModal, setShowVoiceModal] = useState<boolean>(false);
   const previewPaths = PATHWAYS.map((p) => evaluatePathway(p, DEMO)).sort((a, b) => b.score - a.score);
@@ -243,6 +254,24 @@ export const Home: React.FC<HomeProps> = ({
           </div>
         </div>
       </section>
+
+      {/* Cloudinary Hero Carousel Showcase (Below Header / Hero) */}
+      <section className="py-8 bg-slate-50 border-b border-[#DCE3EA]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <HeroCarousel go={go} />
+        </div>
+      </section>
+
+      {/* Skill Training Gallery (Tailoring, Solar, Computer, Agriculture) */}
+      <SkillTrainingGallery go={go} />
+
+      {/* Local Business Showcase (Artisans and SHG handmade products) */}
+      <LocalBusinessShowcase
+        onNotify={onNotify || (() => {})}
+        userName={userName}
+        userPhone={userPhone}
+        userLocation={userLocation}
+      />
 
       {/* Feature Pillars */}
       <section className="py-16 bg-[#F5F7FA]">
