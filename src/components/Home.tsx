@@ -7,8 +7,6 @@ import { PWAInstallStatusButton } from './PWAInstallStatusButton';
 import { HeroCarousel } from './HeroCarousel';
 import { SkillTrainingGallery } from './SkillTrainingGallery';
 import { LocalBusinessShowcase } from './LocalBusinessShowcase';
-import { AppWelcome } from './AppWelcome';
-import { AppUser } from '../services/firebase';
 
 interface HomeProps {
   go: (view: AppView, sectionId?: string) => void;
@@ -21,7 +19,6 @@ interface HomeProps {
   userName?: string;
   userPhone?: string;
   userLocation?: string;
-  currentUser?: AppUser | null;
 }
 
 export const Home: React.FC<HomeProps> = ({
@@ -35,7 +32,6 @@ export const Home: React.FC<HomeProps> = ({
   userName,
   userPhone,
   userLocation,
-  currentUser,
 }) => {
   const previewPaths = PATHWAYS.map((p) => evaluatePathway(p, DEMO)).sort((a, b) => b.score - a.score);
   const previewJobs = rankJobs(DEMO, previewPaths).slice(0, 2);
@@ -47,8 +43,6 @@ export const Home: React.FC<HomeProps> = ({
       go('assessment');
     }
   };
-
-  const showWelcomeScreen = !hasProfile && (!currentUser || currentUser.isAnonymous);
 
   const pillars = [
     {
@@ -76,15 +70,6 @@ export const Home: React.FC<HomeProps> = ({
 
   return (
     <main>
-      {showWelcomeScreen && onOpenAccount && (
-        <AppWelcome
-          currentLang={currentLang}
-          onOpenAccount={onOpenAccount}
-          onStartVoice={handleStartVoice}
-          onLoadDemo={onLoadDemo}
-        />
-      )}
-
       {/* Civic White & Navy Hero Section */}
       <section className="bg-white border-b border-[#DCE3EA] py-12 md:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
