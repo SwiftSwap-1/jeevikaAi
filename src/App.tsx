@@ -440,6 +440,8 @@ export default function App() {
             locationData={locationData}
             onRefreshLocationAi={handleRefreshLocationAi}
             isRefreshingLocationData={isRefreshingLocationData}
+            shortlist={shortlist}
+            onShortlistToggle={handleShortlistToggle}
           />
         )}
 

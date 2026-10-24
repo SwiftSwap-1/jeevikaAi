@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { authService, AppUser } from '../services/firebase';
+import { authService, AppUser, isAdminUser } from '../services/firebase';
 import { Icon } from './Icons';
 
 interface AdminLoginModalProps {
@@ -22,6 +22,26 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleGoogle = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const user = await authService.loginWithGoogle();
+      if (!isAdminUser(user)) {
+        await authService.logout();
+        setError('इस Google खाते के पास प्रशासनिक अनुमति नहीं है। (Access Denied: Not an authorized admin account)');
+        return;
+      }
+      onSuccess(user);
+      onNotify('प्रशासक के रूप में लॉगिन सफल! (Admin Authentication Successful)');
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Google लॉगिन विफल रहा।');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -29,9 +49,9 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
     try {
       const cleanEmail = email.trim().toLowerCase();
-      const user = await authService.loginWithEmail(cleanEmail, password.trim());
+      const user = await authService.loginWithEmail(cleanEmail, password);
       
-      const isAdmin = user.role === 'admin' || user.email?.toLowerCase() === 'ayushgupt640@gmail.com';
+      const isAdmin = isAdminUser(user);
       if (!isAdmin) {
         setError('इस खाते के पास प्रशासनिक अनुमति नहीं है। (Access Denied: Not an authorized admin account)');
         setLoading(false);
@@ -143,6 +163,22 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             )}
           </button>
         </form>
+
+        <div className="flex items-center gap-2 text-[11px] text-[#5F6B76]">
+          <span className="flex-1 h-px bg-[#DCE3EA]" />
+          <span>या (or)</span>
+          <span className="flex-1 h-px bg-[#DCE3EA]" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading}
+          className="w-full py-3 rounded-xl border border-[#DCE3EA] bg-white hover:bg-[#F5F7FA] text-[#17365D] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+        >
+          <span className="w-5 h-5 rounded-full bg-[#245A91] text-white text-[11px] font-extrabold flex items-center justify-center">G</span>
+          <span>Google से लॉगिन करें (Sign in with Google)</span>
+        </button>
 
         <div className="pt-2 border-t border-[#DCE3EA] text-center text-[11px] text-[#5F6B76]">
           <span>JeevikaAI Security System · End-to-End Encrypted</span>

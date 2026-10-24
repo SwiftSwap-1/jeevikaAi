@@ -3,7 +3,7 @@ import { Logo } from './Logo';
 import { Icon } from './Icons';
 import { SupportedLanguage, AppView } from '../types';
 import { LANG_CONFIG } from '../data/mockData';
-import { AppUser } from '../services/firebase';
+import { AppUser, isAdminUser } from '../services/firebase';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface NavbarProps {
@@ -76,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     go(v, s);
   };
 
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'ayushgupt640@gmail.com';
+  const isAdmin = isAdminUser(currentUser);
   const activeLangConfig = LANG_CONFIG.find((l) => l.k === currentLang) || LANG_CONFIG[0];
 
   return (

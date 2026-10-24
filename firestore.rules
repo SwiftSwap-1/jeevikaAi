@@ -1,10 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Super Administrator helper rule
+    // Super Administrator helper rule.
+    // The email must be verified (Google sign-in always is) so nobody can claim the admin
+    // address by registering it first with an email/password account.
     function isAdmin() {
       return request.auth != null && (
-        request.auth.token.email == 'ayushgupt640@gmail.com' ||
+        (request.auth.token.email == 'ayushgupt640@gmail.com' && request.auth.token.email_verified == true) ||
         request.auth.token.role == 'admin'
       );
     }
@@ -17,7 +19,7 @@ service cloud.firestore {
     // Assessment submissions and user skill analytics
     match /assessments/{assessmentId} {
       allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 

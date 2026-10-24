@@ -3,7 +3,7 @@ import { Icon } from './Icons';
 import { Opportunity, Pathway, BeneficiaryProfile, AppView } from '../types';
 import { JOBS, PATHWAYS, DEMO } from '../data/mockData';
 import { storageService } from '../services/storageService';
-import { AppUser } from '../services/firebase';
+import { AppUser, isAdminUser } from '../services/firebase';
 
 interface AdminCMSViewProps {
   currentUser?: AppUser | null;
@@ -165,7 +165,7 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
   onOpenLogin,
   onLogout,
 }) => {
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'ayushgupt640@gmail.com';
+  const isAdmin = isAdminUser(currentUser);
 
   // Navigation Tabs inside Admin Portal
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'jobs' | 'pathways' | 'districts' | 'notifications'>('overview');
