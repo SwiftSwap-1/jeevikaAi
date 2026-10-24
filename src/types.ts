@@ -231,7 +231,8 @@ export type AppView =
   | 'settings'
   | 'admin'
   | 'login'
-  | 'business-upload';
+  | 'business-upload'
+  | 'seller-analytics';
 
 export interface SummaryModalData {
   text: string;

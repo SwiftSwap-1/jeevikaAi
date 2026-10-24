@@ -22,6 +22,7 @@ import { VoiceStartModal } from './components/VoiceStartModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AssistedAccountModal, AccountMode } from './components/AssistedAccountModal';
 import { LocalBusinessUpload } from './components/LocalBusinessUpload';
+import { SellerAnalytics } from './components/SellerAnalytics';
 
 import { FloatingVoiceAssistant } from './components/FloatingVoiceAssistant';
 import { BeneficiaryProfile, SupportedLanguage, AppView, Opportunity, SummaryModalData, LocationLivelihoodData } from './types';
@@ -684,6 +685,14 @@ export default function App() {
             userPhone={profile?.phone}
             userLocation={profile?.location}
             onClose={() => navigateTo('home')}
+          />
+        )}
+
+        {currentView === 'seller-analytics' && (
+          <SellerAnalytics
+            currentUser={currentUser}
+            onNotify={notify}
+            go={navigateTo}
           />
         )}
       </div>
