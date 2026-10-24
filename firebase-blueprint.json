@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Beneficiary profile with demographic, educational, and livelihood data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "education": { "type": "string", "maxLength": 100 },
+        "skills": { "type": "string", "maxLength": 500 },
+        "interests": { "type": "string", "maxLength": 500 },
+        "occupation": { "type": "string", "maxLength": 100 },
+        "location": { "type": "string", "maxLength": 150 },
+        "workType": { "type": "string", "maxLength": 50 },
+        "mobility": { "type": "string", "maxLength": 100 },
+        "consentSaved": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["location", "updatedAt"]
+    },
+    "Opportunity": {
+      "title": "Opportunity",
+      "description": "Hyperlocal livelihood job or self-employment opportunity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "org": { "type": "string", "maxLength": 200 },
+        "type": { "type": "string", "enum": ["Job", "Self-employment", "Training"] },
+        "loc": { "type": "string", "maxLength": 200 },
+        "district": { "type": "string", "maxLength": 100 },
+        "km": { "type": "number" },
+        "pay": { "type": "string", "maxLength": 100 },
+        "path": { "type": "string", "maxLength": 100 },
+        "verified": { "type": "boolean" },
+        "source": { "type": "string", "maxLength": 200 },
+        "lastVerifiedDate": { "type": "string", "maxLength": 50 },
+        "eligibility": { "type": "string", "maxLength": 500 },
+        "contactInfo": { "type": "string", "maxLength": 200 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "org", "type", "loc"]
+    },
+    "TrainingCenter": {
+      "title": "TrainingCenter",
+      "description": "Certified PMKVY, RSETI, or ITI skill training center",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "org": { "type": "string", "maxLength": 200 },
+        "type": { "type": "string", "enum": ["Training"] },
+        "loc": { "type": "string", "maxLength": 200 },
+        "district": { "type": "string", "maxLength": 100 },
+        "km": { "type": "number" },
+        "pay": { "type": "string", "maxLength": 100 },
+        "path": { "type": "string", "maxLength": 100 },
+        "verified": { "type": "boolean" },
+        "source": { "type": "string", "maxLength": 200 },
+        "lastVerifiedDate": { "type": "string", "maxLength": 50 },
+        "eligibility": { "type": "string", "maxLength": 500 },
+        "contactInfo": { "type": "string", "maxLength": 200 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "org", "loc"]
+    },
+    "Pathway": {
+      "title": "Pathway",
+      "description": "NSQF-aligned career pathway and progression roadmap",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "hi": { "type": "string", "maxLength": 200 },
+        "role": { "type": "string", "maxLength": 200 },
+        "duration": { "type": "string", "maxLength": 100 },
+        "nsqf": { "type": "number" },
+        "minEdu": { "type": "number" },
+        "demand": { "type": "number" },
+        "demandNote": { "type": "string", "maxLength": 300 }
+      },
+      "required": ["id", "name", "role"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile with personal and livelihood preferences"
+    },
+    "/opportunities/{opportunityId}": {
+      "schema": "Opportunity",
+      "description": "Public verified job and self-employment opportunities"
+    },
+    "/training_centers/{centerId}": {
+      "schema": "TrainingCenter",
+      "description": "Public accredited skill development centers and institutes"
+    },
+    "/pathways/{pathwayId}": {
+      "schema": "Pathway",
+      "description": "Curated NSQF career progression pathways"
+    }
+  }
+}

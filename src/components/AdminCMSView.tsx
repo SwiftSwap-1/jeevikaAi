@@ -3,7 +3,7 @@ import { Icon } from './Icons';
 import { Opportunity, Pathway, BeneficiaryProfile, AppView } from '../types';
 import { JOBS, PATHWAYS, DEMO } from '../data/mockData';
 import { storageService } from '../services/storageService';
-import { AppUser, isAdminUser } from '../services/firebase';
+import { AppUser, isAdminUser, contentService } from '../services/firebase';
 
 interface AdminCMSViewProps {
   currentUser?: AppUser | null;
@@ -376,6 +376,12 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
     };
 
     setOpportunities((prev) => [newJob, ...prev]);
+    // Save to Firestore so OpportunitiesView and TrainingView update in real time
+    contentService.upsert('opportunities', newJob.id, newJob);
+    if (newJob.type === 'Training') {
+      contentService.upsert('training_centers', newJob.id, newJob);
+    }
+
     setShowAddJobModal(false);
     setJobTitle('');
     setJobOrg('');
@@ -383,7 +389,7 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
     setJobPay('');
     setJobEligibility('');
     setJobContact('');
-    onNotify('New Job Opportunity published successfully!');
+    onNotify('New Job Opportunity published successfully to Firestore!');
   };
 
   // Add Pathway Handler
@@ -414,27 +420,37 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
     };
 
     setPathways((prev) => [newPath, ...prev]);
+    contentService.upsert('pathways', newPath.id, newPath);
     setShowAddPathwayModal(false);
     setPathwayName('');
     setPathwayHi('');
     setPathwayRole('');
-    onNotify('New NSQF Skill Pathway added to curriculum!');
+    onNotify('New NSQF Skill Pathway added to curriculum & Firestore!');
   };
 
   // Delete Job
   const handleDeleteJob = (id: string) => {
     if (confirm('Are you sure you want to delete this opportunity?')) {
       setOpportunities((prev) => prev.filter((o) => o.id !== id));
-      onNotify('Opportunity removed.');
+      contentService.remove('opportunities', id);
+      contentService.remove('training_centers', id);
+      onNotify('Opportunity removed from Firestore.');
     }
   };
 
   // Toggle Verification
   const handleToggleVerify = (id: string) => {
     setOpportunities((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, verified: !o.verified } : o))
+      prev.map((o) => {
+        if (o.id === id) {
+          const updated = { ...o, verified: !o.verified };
+          contentService.upsert('opportunities', id, updated);
+          return updated;
+        }
+        return o;
+      })
     );
-    onNotify('Verification state updated.');
+    onNotify('Verification state updated in Firestore.');
   };
 
   // Export CSV

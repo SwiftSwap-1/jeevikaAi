@@ -20,10 +20,40 @@ import {
   getDoc,
   deleteDoc,
   collection,
-  getDocs
+  getDocs,
+  onSnapshot,
+  getDocFromServer,
+  query,
+  where
 } from 'firebase/firestore';
 import { BeneficiaryProfile } from '../types';
 import appletConfig from '../../firebase-applet-config.json';
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
 
 export interface AppUser {
   uid: string;
@@ -93,18 +123,61 @@ const DEVICE_UID_KEY = 'jeevika_device_uid_v1';
 let cachedApp: any = null;
 let cachedDb: any = null;
 
-function getFirebaseApp() {
+export function getFirebaseApp() {
   if (!cachedApp) {
     cachedApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   }
   return cachedApp;
 }
 
-function getDb() {
+export function getDb() {
   if (!cachedDb) {
     cachedDb = getFirestore(getFirebaseApp(), FIRESTORE_DATABASE_ID);
   }
   return cachedDb;
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): FirestoreErrorInfo {
+  let fbAuth: any = null;
+  try {
+    fbAuth = getAuth(getFirebaseApp());
+  } catch {}
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: fbAuth?.currentUser?.uid,
+      email: fbAuth?.currentUser?.email,
+      emailVerified: fbAuth?.currentUser?.emailVerified,
+      isAnonymous: fbAuth?.currentUser?.isAnonymous,
+      tenantId: fbAuth?.currentUser?.tenantId,
+      providerInfo: fbAuth?.currentUser?.providerData?.map((provider: any) => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  return errInfo;
+}
+
+// Bootstrapped connection verification as required by skill guidelines
+async function testConnection() {
+  if (typeof window === 'undefined') return;
+  try {
+    const db = getDb();
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firestore offline:', error.message);
+    }
+  }
+}
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    testConnection();
+  }, 100);
 }
 
 /** Firestore rejects `undefined` values; drop them (and keep the data JSON-safe). */
@@ -527,6 +600,40 @@ export const contentService = {
     } catch (e: any) {
       console.warn(`Could not load ${name} from Firestore:`, e?.code || e?.message || e);
       return [];
+    }
+  },
+
+  /**
+   * Real-time subscription to a Firestore content collection.
+   * Invokes onUpdate with array of documents on snapshot updates.
+   * Includes strict handleFirestoreError callback per Firebase skill directives.
+   */
+  subscribe<T = any>(
+    name: ContentCollection,
+    onUpdate: (items: T[]) => void,
+    onError?: (error: any) => void
+  ): () => void {
+    if (!isRealFirebaseConfigured) {
+      return () => {};
+    }
+    try {
+      const colRef = collection(getDb(), name);
+      const unsubscribe = onSnapshot(
+        colRef,
+        (snapshot) => {
+          const items = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() }) as T);
+          onUpdate(items);
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.LIST, name);
+          if (onError) onError(error);
+        }
+      );
+      return unsubscribe;
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.LIST, name);
+      if (onError) onError(err);
+      return () => {};
     }
   },
 
