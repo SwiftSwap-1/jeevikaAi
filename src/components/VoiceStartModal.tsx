@@ -13,6 +13,7 @@ const LANGUAGES = [
   { id: 'hi' as SupportedLanguage, name: 'हिन्दी', sub: 'Hindi' },
   { id: 'bho' as SupportedLanguage, name: 'भोजपुरी', sub: 'Bhojpuri' },
   { id: 'en' as SupportedLanguage, name: 'English', sub: 'English' },
+  { id: 'hin' as SupportedLanguage, name: 'Hinglish', sub: 'हिंग्लिश' },
 ];
 
 export const VoiceStartModal: React.FC<VoiceStartModalProps> = ({
@@ -57,7 +58,7 @@ export const VoiceStartModal: React.FC<VoiceStartModalProps> = ({
           <label className="text-xs font-bold text-[#17365D]">
             बातचीत की भाषा चुनें (Select Conversation Language):
           </label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {LANGUAGES.map((lang) => (
               <button
                 key={lang.id}

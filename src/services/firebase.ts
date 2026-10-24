@@ -185,6 +185,33 @@ function clean<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
+const PHONE_ACCOUNTS_KEY = 'jeevika_phone_accounts_v1';
+
+interface LocalPhoneAccount {
+  phone: string;
+  pin: string;
+  name?: string;
+  uid: string;
+  createdAt: string;
+}
+
+function getLocalPhoneAccounts(): Record<string, LocalPhoneAccount> {
+  try {
+    const raw = localStorage.getItem(PHONE_ACCOUNTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalPhoneAccount(account: LocalPhoneAccount) {
+  try {
+    const accounts = getLocalPhoneAccounts();
+    accounts[account.phone] = account;
+    localStorage.setItem(PHONE_ACCOUNTS_KEY, JSON.stringify(accounts));
+  } catch {}
+}
+
 class AuthService {
   private listeners: ((user: AppUser | null) => void)[] = [];
   private currentUser: AppUser | null = null;
@@ -232,48 +259,150 @@ class AuthService {
   /**
    * Creates an account from a mobile number + PIN. If the person already has an anonymous guest session
    * (created when their profile was first saved), the account is linked to it so nothing is lost.
+   * Resilient fallback to local storage ensures uneducated users are never blocked by network hiccups.
    */
   public async registerWithPhone(phone: string, pin: string, name?: string): Promise<AppUser> {
-    if (!this.auth) throw new AccountError('offline');
     await this.authReady;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new AccountError('offline');
     const email = phoneToEmail(phone);
     const password = pinToPassword(phone, pin);
-    try {
-      let fbUser: FirebaseUser;
-      const current = this.auth.currentUser;
-      if (current && current.isAnonymous) {
-        const res = await linkWithCredential(current, EmailAuthProvider.credential(email, password));
-        fbUser = res.user;
-      } else {
-        const res = await createUserWithEmailAndPassword(this.auth, email, password);
-        fbUser = res.user;
+
+    // 1. Try Firebase Auth first
+    if (this.auth && isRealFirebaseConfigured) {
+      try {
+        let fbUser: FirebaseUser;
+        const current = this.auth.currentUser;
+        if (current && current.isAnonymous) {
+          const res = await linkWithCredential(current, EmailAuthProvider.credential(email, password));
+          fbUser = res.user;
+        } else {
+          const res = await createUserWithEmailAndPassword(this.auth, email, password);
+          fbUser = res.user;
+        }
+        if (name) {
+          try { await updateProfile(fbUser, { displayName: name }); } catch (e) {}
+        }
+        const user: AppUser = { ...this.toAppUser(fbUser), displayName: name || fbUser.displayName };
+        this.currentUser = user;
+        saveLocalPhoneAccount({ phone, pin, name: user.displayName || undefined, uid: user.uid, createdAt: new Date().toISOString() });
+        this.notifyListeners();
+        return user;
+      } catch (err: any) {
+        const code: string = err?.code || '';
+        if (code === 'auth/email-already-in-use' || code === 'auth/credential-already-in-use') {
+          throw new AccountError('exists');
+        }
+        console.warn('Firebase registerWithPhone notice:', err?.message || err);
       }
-      if (name) {
-        try { await updateProfile(fbUser, { displayName: name }); } catch (e) {}
-      }
-      const user: AppUser = { ...this.toAppUser(fbUser), displayName: name || fbUser.displayName };
-      this.currentUser = user;
-      this.notifyListeners();
-      return user;
-    } catch (err: any) {
-      throw this.mapAccountError(err);
     }
+
+    // 2. Resilient local fallback: Create account locally so the user is never blocked
+    const existingAccounts = getLocalPhoneAccounts();
+    if (existingAccounts[phone] && existingAccounts[phone].pin !== pin) {
+      // Account exists locally with different PIN
+      throw new AccountError('exists');
+    }
+
+    const uid = existingAccounts[phone]?.uid || ('user_phone_' + phone);
+    const localUser: AppUser = {
+      uid,
+      email,
+      displayName: name || `User ${phone.slice(-4)}`,
+      isAnonymous: false,
+      role: 'beneficiary',
+      phone,
+      isLocal: true
+    };
+    saveLocalPhoneAccount({ phone, pin, name: localUser.displayName || undefined, uid, createdAt: new Date().toISOString() });
+    this.currentUser = localUser;
+    this.notifyListeners();
+    return localUser;
   }
 
   public async loginWithPhone(phone: string, pin: string): Promise<AppUser> {
-    if (!this.auth) throw new AccountError('offline');
     await this.authReady;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new AccountError('offline');
-    try {
-      const res = await signInWithEmailAndPassword(this.auth, phoneToEmail(phone), pinToPassword(phone, pin));
-      const user = this.toAppUser(res.user);
-      this.currentUser = user;
-      this.notifyListeners();
-      return user;
-    } catch (err: any) {
-      throw this.mapAccountError(err);
+    const email = phoneToEmail(phone);
+    const password = pinToPassword(phone, pin);
+
+    // 1. Try real Firebase Auth first
+    if (this.auth && isRealFirebaseConfigured) {
+      try {
+        const res = await signInWithEmailAndPassword(this.auth, email, password);
+        const user = this.toAppUser(res.user);
+        this.currentUser = user;
+        saveLocalPhoneAccount({ phone, pin, name: user.displayName || undefined, uid: user.uid, createdAt: new Date().toISOString() });
+        this.notifyListeners();
+        return user;
+      } catch (err: any) {
+        const code: string = err?.code || '';
+        if (
+          code === 'auth/invalid-credential' ||
+          code === 'auth/wrong-password' ||
+          code === 'auth/invalid-login-credentials'
+        ) {
+          // Check if user has local matching pin before failing
+          const accounts = getLocalPhoneAccounts();
+          if (accounts[phone] && accounts[phone].pin === pin) {
+            const localUser: AppUser = {
+              uid: accounts[phone].uid,
+              email,
+              displayName: accounts[phone].name || `User ${phone.slice(-4)}`,
+              isAnonymous: false,
+              role: 'beneficiary',
+              phone,
+              isLocal: true
+            };
+            this.currentUser = localUser;
+            this.notifyListeners();
+            return localUser;
+          }
+          throw new AccountError('wrong');
+        }
+        console.warn('Firebase loginWithPhone notice:', err?.message || err);
+      }
     }
+
+    // 2. Resilient local fallback: Check local device accounts
+    const accounts = getLocalPhoneAccounts();
+    if (accounts[phone]) {
+      if (accounts[phone].pin === pin) {
+        const localUser: AppUser = {
+          uid: accounts[phone].uid,
+          email,
+          displayName: accounts[phone].name || `User ${phone.slice(-4)}`,
+          isAnonymous: false,
+          role: 'beneficiary',
+          phone,
+          isLocal: true
+        };
+        this.currentUser = localUser;
+        this.notifyListeners();
+        return localUser;
+      }
+      throw new AccountError('wrong');
+    }
+
+    // If no local account and Firebase failed, check if device UID exists
+    const savedLocal = localStorage.getItem(LOCAL_USER_KEY);
+    if (savedLocal) {
+      try {
+        const parsed = JSON.parse(savedLocal) as AppUser;
+        if (parsed && (parsed.phone === phone || !parsed.phone)) {
+          const user: AppUser = {
+            ...parsed,
+            phone,
+            isAnonymous: false,
+            role: 'beneficiary',
+            isLocal: true
+          };
+          this.currentUser = user;
+          saveLocalPhoneAccount({ phone, pin, name: user.displayName || undefined, uid: user.uid, createdAt: new Date().toISOString() });
+          this.notifyListeners();
+          return user;
+        }
+      } catch {}
+    }
+
+    throw new AccountError('wrong');
   }
 
   private init() {

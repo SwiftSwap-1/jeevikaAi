@@ -155,6 +155,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
+              onClick={() => {
+                if (onStartVoiceAssessment) onStartVoiceAssessment();
+                else handleNav('assessment');
+              }}
+              className={`px-3 py-2 rounded-lg transition-colors hover:text-[#17365D] flex items-center gap-1.5 ${
+                currentView === 'assessment' ? 'text-[#245A91] font-extrabold' : ''
+              }`}
+            >
+              <Icon name="mic" size={13} className="text-[#245A91]" />
+              <span>Assessment</span>
+            </button>
+
+            <button
               onClick={() => handleNav('dashboard')}
               className={`px-3 py-2 rounded-lg transition-colors hover:text-[#17365D] ${
                 currentView === 'dashboard' ? 'text-[#245A91] font-extrabold' : ''
@@ -237,6 +250,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden xs:inline">Offline</span>
               </span>
             )}
+            {/* Primary Start Voice Assessment CTA Button */}
+            <button
+              onClick={() => {
+                if (onStartVoiceAssessment) {
+                  onStartVoiceAssessment();
+                } else {
+                  handleNav('assessment');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-gradient-to-r from-[#245A91] to-[#17365D] hover:from-[#17365D] hover:to-[#0F233D] text-white text-xs font-extrabold shadow-sm hover:shadow-md transition-all active:scale-95 flex-shrink-0"
+              title="बोलकर आजीविका मूल्यांकन शुरू करें (Start Voice Assessment)"
+            >
+              <Icon name="mic" size={14} className="text-cyan-300 animate-pulse" />
+              <span className="hidden xs:inline">
+                {currentLang === 'bho'
+                  ? 'बोल के शुरू करीं'
+                  : currentLang === 'en'
+                  ? 'Voice Assessment'
+                  : 'बोलकर शुरू करें'}
+              </span>
+              <span className="xs:hidden text-[11px]">माइक</span>
+            </button>
+
             {/* Desktop PWA Install Button */}
             {canInstall && (
               <button
@@ -440,6 +476,40 @@ export const Navbar: React.FC<NavbarProps> = ({
 
 
 
+            {/* Prominent Voice Assessment Card in Mobile Drawer */}
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (onStartVoiceAssessment) {
+                  onStartVoiceAssessment();
+                } else {
+                  handleNav('assessment');
+                }
+              }}
+              className="w-full min-h-14 px-4 py-3 rounded-2xl bg-gradient-to-r from-[#245A91] via-[#1C4673] to-[#17365D] text-white text-sm font-extrabold flex items-center justify-between gap-2 shadow-md active:scale-[0.99]"
+            >
+              <span className="flex items-center gap-3 text-left">
+                <span className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <Icon name="mic" size={20} className="text-cyan-300 animate-pulse" />
+                </span>
+                <div>
+                  <div className="font-extrabold text-white text-sm leading-tight">
+                    {currentLang === 'bho'
+                      ? 'बोल के शुरू करीं (Voice Assessment)'
+                      : currentLang === 'en'
+                      ? 'Start Voice Assessment'
+                      : 'बोलकर शुरू करें (Voice Assessment)'}
+                  </div>
+                  <div className="text-[11px] text-cyan-200 font-normal mt-0.5">
+                    {currentLang === 'bho'
+                      ? '8 आसान सवाल के आवाज से जवाब दीं'
+                      : '8 सरल सवालों के आवाज से जवाब दें'}
+                  </div>
+                </div>
+              </span>
+              <Icon name="chev" size={14} className="text-white/80" />
+            </button>
+
             {/* Main Navigation Links */}
             <div className="space-y-1 pt-1 border-t border-[#DCE3EA]">
               <div className="text-[10px] font-bold uppercase tracking-wider text-[#5F6B76] px-2 py-1">
@@ -452,6 +522,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <span>मुख्य पृष्ठ (Home)</span>
+                <Icon name="chev" size={12} className="opacity-40" />
+              </button>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (onStartVoiceAssessment) onStartVoiceAssessment();
+                  else handleNav('assessment');
+                }}
+                className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between ${
+                  currentView === 'assessment' ? 'bg-[#245A91]/10 text-[#245A91] font-bold' : 'hover:bg-[#F5F7FA] text-[#202B36]'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Icon name="mic" size={14} className="text-[#245A91]" />
+                  <span>बोलकर मूल्यांकन (Voice Assessment)</span>
+                </span>
                 <Icon name="chev" size={12} className="opacity-40" />
               </button>
               <button
