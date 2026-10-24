@@ -440,7 +440,7 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
       pay: jobPay || '₹9,000 - ₹14,000 / month',
       path: 'digital',
       verified: true,
-      source: 'Super Administrator Direct Entry (Ayush Gupta)',
+      source: 'Super Administrator Direct Entry',
       lastVerifiedDate: 'October 2026',
       eligibility: jobEligibility || `${jobMinEdu} with basic technical training.`,
       documentsRequired: ['Aadhaar Card', 'Mark sheet', 'Bank Passbook'],
@@ -618,7 +618,7 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
             National Skill &amp; Livelihood Intelligence Platform
           </h1>
           <p className="text-xs sm:text-sm text-white/80">
-            Logged in as <strong>{currentUser?.displayName || 'Ayush Gupta (Super Admin)'}</strong> ({currentUser?.email})
+            Logged in as <strong>{currentUser?.displayName || 'Super Admin'}</strong> ({currentUser?.email})
           </p>
         </div>
 

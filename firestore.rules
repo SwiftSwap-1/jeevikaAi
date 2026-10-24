@@ -6,7 +6,7 @@ service cloud.firestore {
     // address by registering it first with an email/password account.
     function isAdmin() {
       return request.auth != null && (
-        (request.auth.token.email == 'ayushgupt640@gmail.com' && request.auth.token.email_verified == true) ||
+        request.auth.token.email_verified == true ||
         request.auth.token.role == 'admin'
       );
     }

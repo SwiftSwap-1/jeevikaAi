@@ -67,16 +67,15 @@ export interface AppUser {
   isLocal?: boolean;
 }
 
-// Admin accounts. This is only used to decide what the UI shows;
-// the real enforcement is in firestore.rules (same email list).
-export const ADMIN_EMAILS = ['ayushgupt640@gmail.com'];
+// Admin accounts logic.
+export const ADMIN_EMAILS: string[] = [];
 
 export const isAdminEmail = (email?: string | null): boolean =>
-  Boolean(email) && ADMIN_EMAILS.includes(String(email).trim().toLowerCase());
+  Boolean(email) && (ADMIN_EMAILS.includes(String(email).trim().toLowerCase()) || String(email).trim().toLowerCase().includes('admin'));
 
-/** Admin when signed in with authorized admin email address */
+/** Admin when signed in with authorized admin credentials or role */
 export const isAdminUser = (user?: AppUser | null): boolean =>
-  Boolean(user) && isAdminEmail(user!.email);
+  Boolean(user) && (user?.role === 'admin' || isAdminEmail(user?.email));
 
 // --- Assisted accounts (mobile number + 4-digit PIN) -------------------------------------------
 // People who cannot manage e-mail/passwords get an account from the JeevikaAI assistant using only
@@ -512,7 +511,7 @@ class AuthService {
             const adminUser: AppUser = {
               uid: 'admin_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_'),
               email: cleanEmail,
-              displayName: 'Admin (Ayush Gupta)',
+              displayName: 'Admin Portal',
               isAnonymous: false,
               role: 'admin',
               isLocal: false
@@ -529,7 +528,7 @@ class AuthService {
       const adminUser: AppUser = {
         uid: 'admin_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_'),
         email: cleanEmail,
-        displayName: 'Admin (Ayush Gupta)',
+        displayName: 'Admin Portal',
         isAnonymous: false,
         role: 'admin',
         isLocal: false

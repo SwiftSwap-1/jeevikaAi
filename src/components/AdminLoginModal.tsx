@@ -116,7 +116,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
         )}
 
-        {/* Google 1-Click Login (Recommended for ayushgupt640@gmail.com) */}
+        {/* Google 1-Click Login (Recommended for Authorized Personnel) */}
         <button
           type="button"
           onClick={handleGoogle}
@@ -143,7 +143,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="ayushgupt640@gmail.com"
+              placeholder="admin@jeevikaai.org"
               autoComplete="username"
               required
               className="w-full p-2.5 sm:p-3 rounded-xl border border-[#DCE3EA] focus:border-[#245A91] focus:ring-1 focus:ring-[#245A91] focus:outline-none text-[#17365D] font-medium transition-colors"
