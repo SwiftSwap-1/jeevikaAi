@@ -6,14 +6,12 @@ import { SupportedLanguage } from '../types';
 interface AppWelcomeProps {
   currentLang: SupportedLanguage;
   onOpenAccount: (mode: 'create' | 'login') => void;
-  onStartVoice: () => void;
   onLoadDemo: () => void;
 }
 
 export const AppWelcome: React.FC<AppWelcomeProps> = ({
   currentLang,
   onOpenAccount,
-  onStartVoice,
   onLoadDemo,
 }) => {
   return (
@@ -66,23 +64,14 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
             </span>
           </button>
 
-          {/* Voice Assessment / Demo Links */}
-          <div className="pt-3 grid grid-cols-2 gap-2">
-            <button
-              onClick={onStartVoice}
-              className="py-3 px-3 rounded-xl border border-[#DCE3EA] bg-white text-[#17365D] hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-            >
-              <Icon name="mic" size={16} className="text-[#245A91]" />
-              <span>बोलकर शुरू करें</span>
-            </button>
-            <button
-              onClick={onLoadDemo}
-              className="py-3 px-3 rounded-xl border border-[#DCE3EA] bg-white text-[#17365D] hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-            >
-              <Icon name="user" size={16} className="text-[#287D73]" />
-              <span>डेमो देखें</span>
-            </button>
-          </div>
+          {/* Demo Button */}
+          <button
+            onClick={onLoadDemo}
+            className="w-full py-3 px-4 rounded-xl border border-[#DCE3EA] bg-white text-[#17365D] hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <Icon name="user" size={16} className="text-[#287D73]" />
+            <span>डेमो देखें (Load Demo)</span>
+          </button>
         </div>
 
         <div className="pt-2 text-[11px] text-[#5F6B76] font-medium flex items-center justify-center gap-1.5">

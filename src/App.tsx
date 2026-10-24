@@ -500,7 +500,7 @@ export default function App() {
       )}
 
       {/* Navigation Bar */}
-      {!showSplash && (
+      {!showSplash && (!isStandalone || profile) && (
         <Navbar
           currentView={currentView}
           currentLang={currentLang}
@@ -525,14 +525,6 @@ export default function App() {
             <AppWelcome
               currentLang={currentLang}
               onOpenAccount={setAccountMode}
-              onStartVoice={() => {
-                if (!currentUser || currentUser.isAnonymous) {
-                  setAccountMode('create');
-                } else {
-                  setAutoStartAssessment(true);
-                  setCurrentView('assessment');
-                }
-              }}
               onLoadDemo={handleLoadDemoBeneficiary}
             />
           ) : (
