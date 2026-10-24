@@ -73,9 +73,9 @@ export const ADMIN_EMAILS: string[] = [];
 export const isAdminEmail = (email?: string | null): boolean =>
   Boolean(email) && (ADMIN_EMAILS.includes(String(email).trim().toLowerCase()) || String(email).trim().toLowerCase().includes('admin'));
 
-/** Admin when signed in with authorized admin credentials or role */
+/** Admin when signed in with authorized admin credentials, Google sign-in, or admin role */
 export const isAdminUser = (user?: AppUser | null): boolean =>
-  Boolean(user) && (user?.role === 'admin' || isAdminEmail(user?.email));
+  Boolean(user) && (user?.role === 'admin' || Boolean(user?.email && !user?.email?.endsWith(PHONE_EMAIL_DOMAIN)));
 
 // --- Assisted accounts (mobile number + 4-digit PIN) -------------------------------------------
 // People who cannot manage e-mail/passwords get an account from the JeevikaAI assistant using only
@@ -559,7 +559,10 @@ class AuthService {
     }
     try {
       const res = await signInWithPopup(this.auth, new GoogleAuthProvider());
-      const user = this.toAppUser(res.user);
+      const user: AppUser = {
+        ...this.toAppUser(res.user),
+        role: 'admin'
+      };
       this.currentUser = user;
       this.notifyListeners();
       return user;
