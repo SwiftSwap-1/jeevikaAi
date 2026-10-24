@@ -21,6 +21,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+        const vp = document.querySelector('meta[name=viewport]');
+        if (vp) {
+          vp.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+        }
+      }
+    </script>
   </head>
   <body class="bg-[#FFFFFF] text-[#202B36] min-h-screen font-['Hind',system-ui,sans-serif]">
     <div id="root"></div>
