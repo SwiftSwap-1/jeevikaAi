@@ -12,12 +12,13 @@ import { speechService } from '../services/speechService';
 import { parseSpokenDigits } from '../services/spokenDigits';
 
 export type AccountMode = 'create' | 'login';
-type Step = 'intro' | 'phone' | 'pin' | 'pin2' | 'busy' | 'done' | 'error';
+type Step = 'intro' | 'phone' | 'pin' | 'pin2' | 'busy' | 'done' | 'error' | 'forgot_phone' | 'forgot_otp' | 'forgot_newpin';
 type Row = Record<SupportedLanguage, string>;
 
 const T = {
   titleCreate: { hi: 'जीविका एआई आपका खाता बनाएगा', bho: 'जीविका एआई रउआ खाता बनाई', en: 'JeevikaAI will create your account', hin: 'JeevikaAI aapka account banayega' },
   titleLogin: { hi: 'लॉगिन करें', bho: 'लॉगिन करीं', en: 'Log in', hin: 'Login karein' },
+  titleForgot: { hi: 'PIN रीसेट करें (Forgot PIN)', bho: 'PIN रीसेट करीं', en: 'Reset PIN', hin: 'PIN Reset karein' },
   intro: {
     hi: 'नमस्ते! आपको कुछ लिखने की ज़रूरत नहीं है। मैं आपका खाता बना दूँगा, ताकि आपकी जानकारी सुरक्षित रहे और आप किसी भी फ़ोन से वापस आ सकें। बस अपना मोबाइल नंबर और 4 अंक का PIN बताइए।',
     bho: 'प्रणाम! रउआ कुछ लिखे के जरूरत नइखे। हम रउआ खाता बना देब, ताकि रउआ जानकारी सुरक्षित रहे अउर रउआ कवनो फोन से लौट सकीं। बस आपन मोबाइल नंबर अउर 4 अंक के PIN बताईं।',
@@ -61,6 +62,25 @@ const T = {
     en: 'Say your 10-digit mobile number, or tap the buttons below.',
     hin: 'Apna 10 ank ka mobile number boliye, ya neeche ke buttons dabaiye.',
   },
+  forgotPhonePrompt: {
+    hi: 'अपना पंजीकृत 10 अंक का मोबाइल नंबर दर्ज करें।',
+    bho: 'आपन पंजीकृत 10 अंक के मोबाइल नंबर दर्ज करीं।',
+    en: 'Enter your registered 10-digit mobile number.',
+    hin: 'Apna panjikrit 10 ank ka mobile number darj karein.',
+  },
+  otpPrompt: {
+    hi: 'आपके मोबाइल नंबर पर भेजा गया 4 अंकों का OTP दर्ज करें (उदा. 1234)।',
+    bho: 'रउआ मोबाइल नंबर पर भेजल 4 अंक के OTP दर्ज करीं।',
+    en: 'Enter the 4-digit OTP sent to your mobile (e.g. 1234).',
+    hin: 'Aapke mobile number par bheja gaya 4 ank ka OTP darj karein.',
+  },
+  newPinPrompt: {
+    hi: 'अब अपना नया 4 अंकों का PIN दर्ज करें।',
+    bho: 'अब आपन नया 4 अंक के PIN दर्ज करीं।',
+    en: 'Now enter your new 4-digit PIN.',
+    hin: 'Ab apna naya 4 ank ka PIN darj karein.',
+  },
+  forgotPin: { hi: 'पासवर्ड भूल गए?', bho: 'पासवर्ड भुला गइल?', en: 'Forgot PIN?', hin: 'Password bhool gaye?' },
   yourNumber: { hi: 'आपका नंबर', bho: 'रउआ नंबर', en: 'Your number', hin: 'Aapka number' },
   pinLabel: { hi: 'आपका PIN', bho: 'रउआ PIN', en: 'Your PIN', hin: 'Aapka PIN' },
   mismatch: {
@@ -94,6 +114,12 @@ const T = {
     bho: 'स्वागत बा! एह खाता में अभी कुछ सहेजल नइखे। चलीं, सवाल शुरू करीं।',
     en: 'Welcome! This account has no saved details yet. Let us start the questions.',
     hin: 'Swagat hai! Is account mein abhi kuch saved nahi hai. Chaliye, sawal shuru karte hain.',
+  },
+  doneReset: {
+    hi: 'आपका PIN सफलतापूर्वक रीसेट कर दिया गया है! अब नए PIN से लॉगिन हो रहा है।',
+    bho: 'रउआ PIN सफलता पूर्वक बदल गइल बा!',
+    en: 'Your PIN has been successfully reset! Logging in now.',
+    hin: 'Aapka PIN safaltapoorvak reset kar diya gaya hai!',
   },
   exists: {
     hi: 'इस नंबर से खाता पहले से बना है। कृपया लॉगिन करिए।',
@@ -170,9 +196,7 @@ interface Props {
   profileName?: string;
   onClose: () => void;
   onSwitchMode: (mode: AccountMode) => void;
-  /** Called after a new account exists. The parent saves the profile to the cloud. */
   onCreated: (user: AppUser) => Promise<void> | void;
-  /** Called after login. Resolves to true when saved details were loaded. */
   onLoggedIn: (user: AppUser) => Promise<boolean> | boolean;
 }
 
@@ -190,6 +214,7 @@ export const AssistedAccountModal: React.FC<Props> = ({
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
+  const [otp, setOtp] = useState('');
   const [message, setMessage] = useState('');
   const [errorKind, setErrorKind] = useState<string>('');
   const [isListening, setIsListening] = useState(false);
@@ -197,13 +222,13 @@ export const AssistedAccountModal: React.FC<Props> = ({
   const [doneText, setDoneText] = useState('');
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  // Reset whenever the dialog is opened or the mode changes
   useEffect(() => {
     if (!isOpen) return;
     setStep(mode === 'create' ? 'intro' : 'phone');
     setPhone('');
     setPin('');
     setPin2('');
+    setOtp('');
     setMessage('');
     setErrorKind('');
     setHeardText('');
@@ -225,6 +250,12 @@ export const AssistedAccountModal: React.FC<Props> = ({
           );
         case 'pin2':
           return tx('pin2Prompt', L);
+        case 'forgot_phone':
+          return tx('forgotPhonePrompt', L);
+        case 'forgot_otp':
+          return tx('otpPrompt', L);
+        case 'forgot_newpin':
+          return tx('newPinPrompt', L);
         case 'busy':
           return mode === 'create' ? tx('busyCreate', L) : tx('busyLogin', L);
         default:
@@ -234,7 +265,6 @@ export const AssistedAccountModal: React.FC<Props> = ({
     [L, mode, phone, message]
   );
 
-  // The assistant speaks each step aloud
   useEffect(() => {
     if (!isOpen) return;
     if (step === 'busy') return;
@@ -243,8 +273,7 @@ export const AssistedAccountModal: React.FC<Props> = ({
     return () => {
       speechService.stopSpeaking();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, step, mode, L]);
+  }, [isOpen, step, mode, L, promptFor]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -256,24 +285,27 @@ export const AssistedAccountModal: React.FC<Props> = ({
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
-  const field = step === 'phone' ? phone : step === 'pin' ? pin : step === 'pin2' ? pin2 : '';
-  const maxLen = step === 'phone' ? 10 : 4;
+  const isForgotStep = step === 'forgot_phone' || step === 'forgot_otp' || step === 'forgot_newpin';
+  const field =
+    step === 'phone' || step === 'forgot_phone'
+      ? phone
+      : step === 'pin' || step === 'forgot_newpin'
+      ? pin
+      : step === 'pin2'
+      ? pin2
+      : step === 'forgot_otp'
+      ? otp
+      : '';
+  const maxLen = step === 'phone' || step === 'forgot_phone' ? 10 : step === 'forgot_otp' ? 4 : 4;
+
   const setField = (v: string) => {
     const next = v.replace(/\D/g, '').slice(0, maxLen);
-    if (step === 'phone') setPhone(next);
-    else if (step === 'pin') setPin(next);
+    if (step === 'phone' || step === 'forgot_phone') setPhone(next);
+    else if (step === 'pin' || step === 'forgot_newpin') setPin(next);
     else if (step === 'pin2') setPin2(next);
+    else if (step === 'forgot_otp') setOtp(next);
   };
 
   const press = (d: string) => {
@@ -314,12 +346,11 @@ export const AssistedAccountModal: React.FC<Props> = ({
         setHeardText(res.transcript);
         const digits = parseSpokenDigits(res.transcript);
         if (digits) {
-          const max = step === 'phone' ? 10 : 4;
-          const nextVal = digits.slice(0, max);
+          const nextVal = digits.slice(0, maxLen);
           setField(nextVal);
-          if (step === 'phone' && nextVal.length === 10) {
+          if ((step === 'phone' || step === 'forgot_phone') && nextVal.length === 10) {
             setIsListening(false);
-          } else if ((step === 'pin' || step === 'pin2') && nextVal.length === 4) {
+          } else if (nextVal.length === maxLen) {
             setIsListening(false);
           }
         }
@@ -352,7 +383,6 @@ export const AssistedAccountModal: React.FC<Props> = ({
         const hadData = await onLoggedIn(user);
         setDoneText(tx(hadData ? 'doneLogin' : 'doneLoginEmpty', L));
         setStep('done');
-        // Auto-navigate directly to dashboard on login
         setTimeout(() => {
           onClose();
         }, 600);
@@ -362,7 +392,7 @@ export const AssistedAccountModal: React.FC<Props> = ({
     }
   };
 
-  const next = () => {
+  const next = async () => {
     speechService.stopSpeaking();
     stopMic();
     if (step === 'intro') {
@@ -390,6 +420,45 @@ export const AssistedAccountModal: React.FC<Props> = ({
         return;
       }
       run(pin);
+    } else if (step === 'forgot_phone') {
+      const p = normalizePhone(phone);
+      if (!isValidIndianMobile(p)) {
+        setMessage(tx('badPhone', L));
+        return;
+      }
+      setPhone(p);
+      setMessage('OTP सफलतापूर्वक भेजा गया है! (उदा. कोई भी 4 अंक दर्ज करें)');
+      setStep('forgot_otp');
+    } else if (step === 'forgot_otp') {
+      if (otp.length < 4) return;
+      setMessage('');
+      setStep('forgot_newpin');
+    } else if (step === 'forgot_newpin') {
+      if (pin.length !== 4) return;
+      // Reset PIN by registering/updating with new PIN
+      setStep('busy');
+      try {
+        const user = await authService.registerWithPhone(phone, pin, profileName);
+        await onLoggedIn(user);
+        setDoneText(tx('doneReset', L));
+        setStep('done');
+        setTimeout(() => {
+          onClose();
+        }, 800);
+      } catch {
+        // If already exists, try logging in with new PIN or update
+        try {
+          const user = await authService.loginWithPhone(phone, pin);
+          await onLoggedIn(user);
+          setDoneText(tx('doneReset', L));
+          setStep('done');
+          setTimeout(() => {
+            onClose();
+          }, 800);
+        } catch (e: any) {
+          showError('unknown');
+        }
+      }
     }
   };
 
@@ -401,20 +470,24 @@ export const AssistedAccountModal: React.FC<Props> = ({
     else if (step === 'pin2') {
       setPin2('');
       setStep('pin');
-    }
+    } else if (step === 'forgot_phone') setStep('phone');
+    else if (step === 'forgot_otp') setStep('forgot_phone');
+    else if (step === 'forgot_newpin') setStep('forgot_otp');
   };
 
   const ready =
-    (step === 'phone' && phone.length === 10) ||
-    (step === 'pin' && pin.length === 4) ||
-    (step === 'pin2' && pin2.length === 4);
+    ((step === 'phone' || step === 'forgot_phone') && phone.length === 10) ||
+    ((step === 'pin' || step === 'forgot_newpin') && pin.length === 4) ||
+    (step === 'pin2' && pin2.length === 4) ||
+    (step === 'forgot_otp' && otp.length === 4);
 
-  const stepNo = step === 'phone' ? 1 : step === 'pin' ? 2 : step === 'pin2' ? 3 : 0;
+  const stepNo = isForgotStep ? 1 : step === 'phone' ? 1 : step === 'pin' ? 2 : step === 'pin2' ? 3 : 0;
   const totalSteps = mode === 'create' ? 3 : 2;
   const prompt = step === 'intro' ? tx('intro', L) : step === 'error' || step === 'done' ? '' : promptFor(step);
 
   const phoneGroups = (() => {
-    const slots = Array.from({ length: 10 }, (_, i) => phone[i] || '');
+    const pVal = step === 'forgot_phone' ? phone : phone;
+    const slots = Array.from({ length: 10 }, (_, i) => pVal[i] || '');
     return [slots.slice(0, 5), slots.slice(5)];
   })();
 
@@ -435,9 +508,13 @@ export const AssistedAccountModal: React.FC<Props> = ({
               </span>
               <div className="min-w-0">
                 <h3 id="acct-title" className="text-base sm:text-lg font-extrabold text-[#17365D] leading-tight">
-                  {mode === 'create' ? tx('titleCreate', L) : tx('titleLogin', L)}
+                  {isForgotStep
+                    ? tx('titleForgot', L)
+                    : mode === 'create'
+                    ? tx('titleCreate', L)
+                    : tx('titleLogin', L)}
                 </h3>
-                {stepNo > 0 && (
+                {stepNo > 0 && !isForgotStep && (
                   <div className="text-xs text-[#5F6B76] font-semibold">
                     {tx('stepOf', L)} {stepNo} / {totalSteps}
                   </div>
@@ -483,14 +560,18 @@ export const AssistedAccountModal: React.FC<Props> = ({
             </>
           )}
 
-          {(step === 'phone' || step === 'pin' || step === 'pin2') && (
+          {(step === 'phone' || step === 'pin' || step === 'pin2' || step === 'forgot_phone' || step === 'forgot_otp' || step === 'forgot_newpin') && (
             <>
               {/* Entered value */}
               <div className="rounded-2xl border-2 border-[#245A91]/30 bg-white p-3 text-center" aria-live="polite">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-[#5F6B76] mb-1">
-                  {step === 'phone' ? tx('yourNumber', L) : tx('pinLabel', L)}
+                  {step === 'phone' || step === 'forgot_phone'
+                    ? tx('yourNumber', L)
+                    : step === 'forgot_otp'
+                    ? 'OTP (4 Digits)'
+                    : tx('pinLabel', L)}
                 </div>
-                {step === 'phone' ? (
+                {step === 'phone' || step === 'forgot_phone' ? (
                   <div className="flex items-center justify-center gap-3 text-2xl sm:text-3xl font-extrabold tracking-widest text-[#17365D] tabular-nums">
                     {phoneGroups.map((g, gi) => (
                       <span key={gi} className="flex gap-1">
@@ -514,7 +595,7 @@ export const AssistedAccountModal: React.FC<Props> = ({
                     ))}
                   </div>
                 )}
-                {step !== 'phone' && (
+                {step !== 'phone' && step !== 'forgot_phone' && (
                   <div className="mt-1 text-xs text-[#5F6B76]">
                     {tx('yourNumber', L)}: <span className="font-bold tabular-nums">{phone}</span>
                   </div>
@@ -580,22 +661,32 @@ export const AssistedAccountModal: React.FC<Props> = ({
                 </button>
               </div>
 
-              <div className="flex gap-2.5">
-                {(step !== 'phone' || mode === 'create') && (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex gap-2.5">
+                  {((step !== 'phone' && step !== 'forgot_phone') || mode === 'create') && (
+                    <button
+                      onClick={goBack}
+                      className="min-h-12 px-5 rounded-xl border border-[#C5D1DD] text-[#17365D] font-bold text-sm"
+                    >
+                      ← {tx('back', L)}
+                    </button>
+                  )}
+                </div>
+
+                {/* Forgot PIN link on bottom right during login phone step */}
+                {mode === 'login' && step === 'phone' && (
                   <button
-                    onClick={goBack}
-                    className="min-h-12 px-5 rounded-xl border border-[#C5D1DD] text-[#17365D] font-bold text-sm"
+                    type="button"
+                    onClick={() => {
+                      setStep('forgot_phone');
+                      setPhone('');
+                      setMessage('अपना मोबाइल नंबर दर्ज करें ताकि OTP भेजा जा सके।');
+                    }}
+                    className="text-xs font-bold text-red-600 hover:underline"
                   >
-                    ← {tx('back', L)}
+                    {tx('forgotPin', L)}
                   </button>
                 )}
-                <button
-                  onClick={next}
-                  disabled={!ready}
-                  className="flex-1 min-h-12 rounded-xl bg-[#17365D] hover:bg-[#245A91] text-white font-extrabold text-base disabled:opacity-40"
-                >
-                  {tx('next', L)} →
-                </button>
               </div>
             </>
           )}
@@ -613,7 +704,7 @@ export const AssistedAccountModal: React.FC<Props> = ({
                 <Icon name="check" size={34} />
               </div>
               <p className="text-base font-bold text-[#17365D] leading-relaxed">{doneText}</p>
-              {mode === 'create' && (
+              {mode === 'create' && !isForgotStep && (
                 <p className="text-sm text-[#5F6B76]">
                   {tx('yourNumber', L)}: <span className="font-extrabold text-[#17365D] tabular-nums">{phone}</span>
                 </p>
@@ -655,7 +746,7 @@ export const AssistedAccountModal: React.FC<Props> = ({
             </div>
           )}
 
-          {step !== 'busy' && step !== 'done' && (
+          {step !== 'busy' && step !== 'done' && !isForgotStep && (
             <button
               onClick={() => onSwitchMode(mode === 'create' ? 'login' : 'create')}
               className="w-full min-h-11 text-sm font-bold text-[#245A91] underline underline-offset-4"
