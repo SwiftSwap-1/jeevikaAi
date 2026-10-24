@@ -267,6 +267,7 @@ export const Home: React.FC<HomeProps> = ({
 
       {/* Local Business Showcase (Artisans and SHG handmade products) */}
       <LocalBusinessShowcase
+        go={go}
         onNotify={onNotify || (() => {})}
         userName={userName}
         userPhone={userPhone}
