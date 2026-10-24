@@ -8,6 +8,7 @@ import {
   SummaryModalData,
   LocationLivelihoodData,
 } from '../types';
+import { AppUser } from '../services/firebase';
 import { rankPaths, rankJobs, buildSummary, slug } from '../services/recommendationEngine';
 import { EDU, WORK, MOB } from '../data/mockData';
 import { speechService } from '../services/speechService';
@@ -46,6 +47,8 @@ interface DashboardProps {
   isRefreshingLocationData?: boolean;
   shortlist?: Record<string, boolean>;
   onShortlistToggle?: (id: string) => void;
+  currentUser?: AppUser | null;
+  onOpenAccount?: (mode: 'create' | 'login') => void;
 }
 
 const Ring: React.FC<{ value: number; size?: number; label: string }> = ({ value, size = 64, label }) => {
@@ -111,6 +114,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   isRefreshingLocationData = false,
   shortlist: shortlistProp,
   onShortlistToggle,
+  currentUser,
+  onOpenAccount,
 }) => {
   const L = currentLang;
   const rankedPaths = useMemo(() => rankPaths(profile), [profile]);
@@ -518,6 +523,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
               )}
             </div>
           </section>
+
+          {/* Assisted account: JeevikaAI creates the account for people who cannot do it themselves */}
+          {hasAssessment && onOpenAccount && (!currentUser || currentUser.isAnonymous) && (
+            <section
+              id="account-banner"
+              className="rounded-2xl border-2 border-[#287D73]/40 bg-[#287D73]/5 p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4"
+            >
+              <span className="w-12 h-12 rounded-xl bg-[#287D73] text-white flex items-center justify-center flex-none">
+                <Icon name="user" size={24} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base sm:text-lg font-extrabold text-[#17365D]">{dt('accTitle', L)}</h2>
+                <p className="text-sm text-[#5F6B76] mt-0.5">{dt('accBody', L)}</p>
+              </div>
+              <div className="flex flex-col sm:flex-row md:flex-col gap-2 md:w-60 flex-none">
+                <button
+                  onClick={() => onOpenAccount('create')}
+                  className="min-h-12 px-4 rounded-xl bg-[#287D73] hover:bg-[#1E6058] text-white text-sm font-extrabold flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <Icon name="mic" size={18} />
+                  {dt('accCreate', L)}
+                </button>
+                <button
+                  onClick={() => onOpenAccount('login')}
+                  className="min-h-11 px-4 rounded-xl border border-[#C5D1DD] bg-white text-[#17365D] text-sm font-bold"
+                >
+                  {dt('accLogin', L)}
+                </button>
+              </div>
+            </section>
+          )}
 
           {/* KPI row */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">

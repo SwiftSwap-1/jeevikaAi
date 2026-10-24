@@ -16,6 +16,7 @@ interface NavbarProps {
   onLogout: () => void;
   onStartVoiceAssessment?: () => void;
   onOpenAdminLogin?: () => void;
+  onOpenAccount?: (mode: 'create' | 'login') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onStartVoiceAssessment,
   onOpenAdminLogin,
+  onOpenAccount,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
@@ -310,6 +312,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
+            {/* Account button: JeevikaAI creates or opens the account by voice */}
+            {onOpenAccount && (!currentUser || currentUser.isAnonymous) && (
+              <button
+                onClick={() => onOpenAccount('login')}
+                className="hidden sm:flex min-h-10 px-3.5 text-xs font-extrabold rounded-xl bg-[#287D73] text-white hover:bg-[#1E6058] transition-colors items-center gap-1.5 shadow-xs"
+              >
+                <Icon name="user" size={14} />
+                <span>
+                  {currentLang === 'en' ? 'Account / Login' : currentLang === 'hin' ? 'Account / Login' : 'खाता / लॉगिन'}
+                </span>
+              </button>
+            )}
+
             {/* Admin Login Button when not logged in */}
             {!currentUser && !profileName && onOpenAdminLogin && (
               <button
@@ -358,6 +373,41 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
           <div className="lg:hidden absolute top-full left-0 right-0 z-50 bg-white border-b border-[#DCE3EA] shadow-2xl max-h-[calc(100vh-6rem)] overflow-y-auto px-4 py-4 space-y-3 text-xs font-semibold animate-fade-in">
+            {onOpenAccount && (!currentUser || currentUser.isAnonymous) && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenAccount('create');
+                }}
+                className="w-full min-h-14 px-4 rounded-2xl bg-[#287D73] text-white text-sm font-extrabold flex items-center justify-between gap-2 shadow-sm active:scale-[0.99]"
+              >
+                <span className="flex items-center gap-2.5 text-left">
+                  <Icon name="user" size={20} />
+                  <span>
+                    {currentLang === 'en'
+                      ? 'JeevikaAI creates your account'
+                      : currentLang === 'hin'
+                      ? 'JeevikaAI aapka account banayega'
+                      : currentLang === 'bho'
+                      ? 'जीविका एआई रउआ खाता बनाई'
+                      : 'जीविका एआई आपका खाता बनाएगा'}
+                  </span>
+                </span>
+                <Icon name="mic" size={18} />
+              </button>
+            )}
+            {onOpenAccount && (!currentUser || currentUser.isAnonymous) && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenAccount('login');
+                }}
+                className="w-full min-h-11 text-sm font-bold text-[#245A91] underline underline-offset-4"
+              >
+                {currentLang === 'en' ? 'Already have an account? Log in' : currentLang === 'hin' ? 'Pehle se account hai? Login' : 'पहले से खाता है? लॉगिन करें'}
+              </button>
+            )}
+
             {/* Beneficiary Profile or User Account & Prominent Logout Button at the Top */}
             {(profileName || currentUser) && (
               <div className="p-3.5 rounded-2xl bg-red-50/80 border border-red-200">

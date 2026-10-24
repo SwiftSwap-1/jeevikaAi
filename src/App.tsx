@@ -20,6 +20,7 @@ import { OpportunityDetailModal } from './components/OpportunityDetailModal';
 import { SummaryModal } from './components/SummaryModal';
 import { VoiceStartModal } from './components/VoiceStartModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { AssistedAccountModal, AccountMode } from './components/AssistedAccountModal';
 import { FloatingVoiceAssistant } from './components/FloatingVoiceAssistant';
 import { BeneficiaryProfile, SupportedLanguage, AppView, Opportunity, SummaryModalData, LocationLivelihoodData } from './types';
 import { DEMO } from './data/mockData';
@@ -58,6 +59,7 @@ export default function App() {
   });
   const [showVoiceStartModal, setShowVoiceStartModal] = useState<boolean>(false);
   const [adminLoginModalOpen, setAdminLoginModalOpen] = useState<boolean>(false);
+  const [accountMode, setAccountMode] = useState<AccountMode | null>(null);
   const [isAnalyzingProfile, setIsAnalyzingProfile] = useState<boolean>(false);
   const [analysisStep, setAnalysisStep] = useState<number>(1);
 
@@ -343,6 +345,43 @@ export default function App() {
     setShowVoiceStartModal(false);
   };
 
+  // JeevikaAI-assisted account: new account keeps the profile the person already gave
+  const handleAccountCreated = async (_user: AppUser) => {
+    if (profile) {
+      try {
+        await firestoreService.syncLocalProfileToFirestore(profile);
+      } catch (err) {
+        console.warn('Profile sync after account creation failed:', err);
+      }
+    }
+  };
+
+  // Login: bring back the profile saved in the cloud for this account
+  const handleAccountLoggedIn = async (user: AppUser): Promise<boolean> => {
+    try {
+      const saved = await firestoreService.getUserProfile(user.uid);
+      if (saved && saved.name) {
+        const { consentSaved: _c, updatedAt: _u, ...restored } = saved as any;
+        const restoredProfile = restored as BeneficiaryProfile;
+        setProfile(restoredProfile);
+        await storageService.saveProfile(restoredProfile);
+        if (restoredProfile.location) setActiveLocation(restoredProfile.location);
+        navigateTo('dashboard');
+        return true;
+      }
+      if (profile) {
+        // First login for this account: keep what was entered on this phone
+        await firestoreService.syncLocalProfileToFirestore(profile);
+        navigateTo('dashboard');
+        return true;
+      }
+    } catch (err) {
+      console.warn('Could not load saved profile after login:', err);
+    }
+    navigateTo('assessment');
+    return false;
+  };
+
   const handleLogout = async () => {
     try {
       await authService.logout();
@@ -399,6 +438,7 @@ export default function App() {
           onLogout={handleLogout}
           onStartVoiceAssessment={() => setShowVoiceStartModal(true)}
           onOpenAdminLogin={() => setAdminLoginModalOpen(true)}
+          onOpenAccount={setAccountMode}
         />
       )}
 
@@ -409,6 +449,7 @@ export default function App() {
             go={navigateTo}
             onLoadDemo={handleLoadDemoBeneficiary}
             onStartVoiceAssessment={handleStartVoiceAssessment}
+            onOpenAccount={setAccountMode}
             currentLang={currentLang}
           />
         )}
@@ -442,6 +483,8 @@ export default function App() {
             isRefreshingLocationData={isRefreshingLocationData}
             shortlist={shortlist}
             onShortlistToggle={handleShortlistToggle}
+            currentUser={currentUser}
+            onOpenAccount={setAccountMode}
           />
         )}
 
@@ -610,6 +653,18 @@ export default function App() {
         currentLang={currentLang}
         onClose={() => setShowVoiceStartModal(false)}
         onConfirm={handleStartVoiceAssessment}
+      />
+
+      {/* JeevikaAI-assisted account creation / login (mobile number + PIN, voice or keypad) */}
+      <AssistedAccountModal
+        isOpen={accountMode !== null}
+        mode={accountMode || 'create'}
+        currentLang={currentLang}
+        profileName={profile?.name}
+        onClose={() => setAccountMode(null)}
+        onSwitchMode={setAccountMode}
+        onCreated={handleAccountCreated}
+        onLoggedIn={handleAccountLoggedIn}
       />
 
       {/* Dedicated Admin Login Modal */}

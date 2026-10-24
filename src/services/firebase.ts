@@ -6,6 +6,9 @@ import {
   signInAnonymously,
   signInWithPopup,
   GoogleAuthProvider,
+  EmailAuthProvider,
+  linkWithCredential,
+  updateProfile,
   signOut as fbSignOut,
   onAuthStateChanged,
   User as FirebaseUser
@@ -27,6 +30,8 @@ export interface AppUser {
   displayName: string | null;
   isAnonymous: boolean;
   role?: 'beneficiary' | 'admin';
+  /** 10-digit mobile number for accounts created through the assisted (mobile + PIN) flow */
+  phone?: string;
   /** true when the user was created by the offline/local fallback and has no real Firebase session */
   isLocal?: boolean;
 }
@@ -41,6 +46,26 @@ export const isAdminEmail = (email?: string | null): boolean =>
 /** Admin only when signed in through real Firebase Auth (never from the local fallback). */
 export const isAdminUser = (user?: AppUser | null): boolean =>
   Boolean(user) && !user!.isLocal && isAdminEmail(user!.email);
+
+// --- Assisted accounts (mobile number + 4-digit PIN) -------------------------------------------
+// People who cannot manage e-mail/passwords get an account from the JeevikaAI assistant using only
+// their mobile number and a 4-digit PIN. Firebase Auth needs an e-mail and a 6+ character password,
+// so both are derived from those two values. No SMS is sent and no real e-mail is involved.
+export const PHONE_EMAIL_DOMAIN = 'phone.jeevikaai.app';
+export const normalizePhone = (raw: string): string => String(raw || '').replace(/\D/g, '').slice(-10);
+export const isValidIndianMobile = (phone: string): boolean => /^[6-9]\d{9}$/.test(phone);
+const phoneToEmail = (phone: string) => `${phone}@${PHONE_EMAIL_DOMAIN}`;
+const pinToPassword = (phone: string, pin: string) => `jv${pin}${phone}`;
+
+export type AccountErrorKind = 'exists' | 'wrong' | 'offline' | 'disabled' | 'locked' | 'unknown';
+export class AccountError extends Error {
+  kind: AccountErrorKind;
+  constructor(kind: AccountErrorKind) {
+    super(kind);
+    this.kind = kind;
+    this.name = 'AccountError';
+  }
+}
 
 const env = (import.meta.env || {}) as Record<string, string | undefined>;
 
@@ -101,13 +126,80 @@ class AuthService {
   }
 
   private toAppUser(fbUser: FirebaseUser): AppUser {
+    const email = fbUser.email;
+    const phone = email && email.endsWith('@' + PHONE_EMAIL_DOMAIN) ? email.split('@')[0] : undefined;
     return {
       uid: fbUser.uid,
-      email: fbUser.email,
+      email,
       displayName: fbUser.displayName,
       isAnonymous: fbUser.isAnonymous,
-      role: isAdminEmail(fbUser.email) ? 'admin' : 'beneficiary'
+      role: isAdminEmail(email) ? 'admin' : 'beneficiary',
+      phone
     };
+  }
+
+  private mapAccountError(err: any): AccountError {
+    const code: string = err?.code || '';
+    if (code === 'auth/email-already-in-use' || code === 'auth/credential-already-in-use') return new AccountError('exists');
+    if (code === 'auth/network-request-failed') return new AccountError('offline');
+    if (code === 'auth/operation-not-allowed' || code === 'auth/admin-restricted-operation') return new AccountError('disabled');
+    if (code === 'auth/too-many-requests') return new AccountError('locked');
+    if (
+      code === 'auth/invalid-credential' ||
+      code === 'auth/wrong-password' ||
+      code === 'auth/user-not-found' ||
+      code === 'auth/invalid-login-credentials'
+    ) {
+      return new AccountError('wrong');
+    }
+    return new AccountError('unknown');
+  }
+
+  /**
+   * Creates an account from a mobile number + PIN. If the person already has an anonymous guest session
+   * (created when their profile was first saved), the account is linked to it so nothing is lost.
+   */
+  public async registerWithPhone(phone: string, pin: string, name?: string): Promise<AppUser> {
+    if (!this.auth) throw new AccountError('offline');
+    await this.authReady;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new AccountError('offline');
+    const email = phoneToEmail(phone);
+    const password = pinToPassword(phone, pin);
+    try {
+      let fbUser: FirebaseUser;
+      const current = this.auth.currentUser;
+      if (current && current.isAnonymous) {
+        const res = await linkWithCredential(current, EmailAuthProvider.credential(email, password));
+        fbUser = res.user;
+      } else {
+        const res = await createUserWithEmailAndPassword(this.auth, email, password);
+        fbUser = res.user;
+      }
+      if (name) {
+        try { await updateProfile(fbUser, { displayName: name }); } catch (e) {}
+      }
+      const user: AppUser = { ...this.toAppUser(fbUser), displayName: name || fbUser.displayName };
+      this.currentUser = user;
+      this.notifyListeners();
+      return user;
+    } catch (err: any) {
+      throw this.mapAccountError(err);
+    }
+  }
+
+  public async loginWithPhone(phone: string, pin: string): Promise<AppUser> {
+    if (!this.auth) throw new AccountError('offline');
+    await this.authReady;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new AccountError('offline');
+    try {
+      const res = await signInWithEmailAndPassword(this.auth, phoneToEmail(phone), pinToPassword(phone, pin));
+      const user = this.toAppUser(res.user);
+      this.currentUser = user;
+      this.notifyListeners();
+      return user;
+    } catch (err: any) {
+      throw this.mapAccountError(err);
+    }
   }
 
   private init() {

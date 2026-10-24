@@ -171,6 +171,18 @@ const D = {
   savedToast: { hi: 'अवसर सहेज लिया गया।', bho: 'मौका सहेज लिहल गइल।', en: 'Saved to your shortlist.', hin: 'Shortlist mein save ho gaya.' },
   removedToast: { hi: 'सहेजी सूची से हटा दिया गया।', bho: 'सहेजल सूची से हटा दिहल गइल।', en: 'Removed from your shortlist.', hin: 'Shortlist se hata diya gaya.' },
 
+  // --- account banner
+  accTitle: { hi: 'जीविका एआई आपका खाता बना देगा', bho: 'जीविका एआई रउआ खाता बना दी', en: 'JeevikaAI can create your account', hin: 'JeevikaAI aapka account bana dega' },
+  accBody: {
+    hi: 'कुछ लिखना नहीं है। सिर्फ़ मोबाइल नंबर और 4 अंक का PIN बताइए। फिर आपकी जानकारी सुरक्षित रहेगी और आप किसी भी फ़ोन से लौट सकेंगे।',
+    bho: 'कुछ लिखे के नइखे। बस मोबाइल नंबर अउर 4 अंक के PIN बताईं। फेर रउआ जानकारी सुरक्षित रही अउर कवनो फोन से लौट सकब।',
+    en: 'Nothing to write. Just say your mobile number and a 4-digit PIN. Your details stay safe and you can return from any phone.',
+    hin: 'Kuch likhna nahi hai. Bas mobile number aur 4 ank ka PIN bataiye. Phir aapki jaankari surakshit rahegi aur aap kisi bhi phone se wapas aa sakte hain.',
+  },
+  accCreate: { hi: 'मेरा खाता बनाइए', bho: 'हमार खाता बनाईं', en: 'Create my account', hin: 'Mera account banaiye' },
+  accLogin: { hi: 'पहले से खाता है? लॉगिन', bho: 'पहिले से खाता बा? लॉगिन', en: 'Have an account? Log in', hin: 'Account hai? Login' },
+  accSaved: { hi: 'खाता सुरक्षित', bho: 'खाता सुरक्षित', en: 'Account saved', hin: 'Account saved' },
+
   // --- misc
   sourceNote: {
     hi: 'ये अवसर व अंक उदाहरण के तौर पर हैं। आवेदन से पहले केंद्र या कार्यालय से पुष्टि कर लें।',
