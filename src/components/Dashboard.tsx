@@ -421,7 +421,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {dt('planTag', L)}
                     </div>
                     <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight !text-white break-words">
-                      {dt('hello', L)}, {displayName}! 👋
+                      {dt('hello', L)}, {displayName}!
                     </h1>
                     <p className="text-sm text-white/90 max-w-xl leading-relaxed">{dt('planSub', L)}</p>
                     {!hasAssessment && (
@@ -468,13 +468,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span>{profile.aiAnalysis.summary}</span>
                     <div className="mt-1.5 flex flex-wrap gap-2">
                       {profile.aiAnalysis.topCareerPathway && (
-                        <span className="px-2 py-0.5 rounded-md bg-white/20 font-bold text-xs">
-                          🎯 {dt('aiField', L)}: {profile.aiAnalysis.topCareerPathway}
+                        <span className="px-2 py-0.5 rounded-md bg-white/20 font-bold text-xs inline-flex items-center gap-1">
+                          <Icon name="target" size={12} className="text-[#38BDF8]" />
+                          <span>{dt('aiField', L)}: {profile.aiAnalysis.topCareerPathway}</span>
                         </span>
                       )}
                       {profile.aiAnalysis.readinessScore ? (
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/30 text-emerald-100 font-bold text-xs">
-                          ⚡ {dt('aiReady', L)}: {profile.aiAnalysis.readinessScore}%
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/30 text-emerald-100 font-bold text-xs inline-flex items-center gap-1">
+                          <Icon name="zap" size={12} className="text-emerald-300" />
+                          <span>{dt('aiReady', L)}: {profile.aiAnalysis.readinessScore}%</span>
                         </span>
                       ) : null}
                     </div>

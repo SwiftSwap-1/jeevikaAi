@@ -183,7 +183,7 @@ export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
                   className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#17365D] hover:bg-[#245A91] text-white font-extrabold text-xs sm:text-sm shadow-lg flex items-center justify-center gap-2.5 mx-auto transition-all active:scale-95"
                 >
                   <Icon name="user" size={18} />
-                  <span>🔐 Google से लॉगिन करें (Google Sign-In)</span>
+                  <span>Google से लॉगिन करें (Google Sign-In)</span>
                 </button>
               )}
             </div>
@@ -205,7 +205,7 @@ export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
             <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-base flex-shrink-0">
-                  ✓
+                  <Icon name="check" size={20} />
                 </div>
                 <div>
                   <div className="font-extrabold text-emerald-900 text-sm">

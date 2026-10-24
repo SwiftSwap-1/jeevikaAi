@@ -270,13 +270,16 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
               }`}
             />
             <span>
-              {isLiveSyncing
-                ? currentLang === 'bho'
-                  ? '⚡ फ़ायरबेस लाइव'
-                  : currentLang === 'en'
-                  ? '⚡ Live Firestore'
-                  : '⚡ लाइव फ़ायरबेस सिंक'
-                : currentLang === 'en'
+              {isLiveSyncing ? (
+                <>
+                  <Icon name="zap" size={12} className="text-amber-500 inline mr-1" />
+                  {currentLang === 'bho'
+                    ? 'फ़ायरबेस लाइव'
+                    : currentLang === 'en'
+                    ? 'Live Firestore'
+                    : 'लाइव फ़ायरबेस सिंक'}
+                </>
+              ) : currentLang === 'en'
                 ? 'Local Cache'
                 : 'स्थानीय डेटा'}
             </span>
@@ -313,7 +316,8 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
                 </span>
               </div>
               <div className="text-lg font-extrabold text-[#17365D] flex items-center gap-2">
-                <span>📍 {selectedDistrict === 'all' ? 'समस्त जिले (All India)' : selectedDistrict}</span>
+                <Icon name="pin" size={18} className="text-[#287D73]" />
+                <span>{selectedDistrict === 'all' ? 'समस्त जिले (All India)' : selectedDistrict}</span>
                 {locationData?.state && selectedDistrict !== 'all' && (
                   <span className="text-xs text-[#5F6B76] font-normal">({locationData.state})</span>
                 )}
@@ -485,8 +489,8 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
                     title="बोलकर सुनें (Listen to training center details in audio)"
                     aria-label="Listen center details"
                   >
-                    <Icon name="volume" size={14} />
-                    <span>{isAudioPlaying ? 'बोल रहा है...' : 'सुनें 🔊'}</span>
+                    <Icon name="volume2" size={14} />
+                    <span>{isAudioPlaying ? 'बोल रहा है...' : 'सुनें'}</span>
                   </button>
                 </div>
 

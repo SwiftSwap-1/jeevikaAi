@@ -27,7 +27,8 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#17365D]/90 via-[#17365D]/40 to-transparent flex flex-col justify-end p-3 text-left">
           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-[#287D73] text-white w-max">
-            <span>✨ राष्ट्रीय कौशल मिशन (NSQF)</span>
+            <Icon name="sparkles" size={12} className="text-amber-300" />
+            <span>राष्ट्रीय कौशल मिशन (NSQF)</span>
           </div>
           <div className="text-white text-xs sm:text-sm font-extrabold drop-shadow-sm mt-0.5">
             ग्रामीण हुनरमंदों व महिला उद्यमियों का डिजिटल सशक्तिकरण
@@ -112,7 +113,7 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#17365D]/80 to-[#287D73]/60 flex items-center justify-center px-4 text-center">
           <div className="text-white text-[11px] sm:text-xs font-bold drop-shadow-sm flex items-center gap-2">
-            <span>🤝</span>
+            <Icon name="briefcase" size={14} className="text-teal-200 flex-shrink-0" />
             <span>स्थानीय स्वयं सहायता समूह (SHG) एवं कारीगरों हेतु समर्पित</span>
           </div>
         </div>

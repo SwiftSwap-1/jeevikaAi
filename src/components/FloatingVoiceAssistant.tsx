@@ -803,7 +803,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
             {/* Hands-Free Voice Guidance Banner for Low-Literacy Users */}
             <div className="bg-[#245A91]/10 border border-[#245A91]/20 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-[11px] text-[#17365D]">
               <div className="flex items-center gap-1.5 font-bold">
-                <span className="text-sm">🗣️</span>
+                <Icon name="mic" size={14} className="text-[#245A91]" />
                 <span>
                   {currentLang === 'en'
                     ? 'Hands-Free: Say "Go to dashboard" or "Open settings"'
@@ -825,7 +825,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-[#17365D] text-white hover:bg-[#245A91] whitespace-nowrap flex items-center gap-1 transition-colors shadow-2xs font-bold"
                 title="डैशबोर्ड पर जाएँ (Go to Dashboard)"
               >
-                <span>📊</span>
+                <Icon name="target" size={12} />
                 <span>{currentLang === 'en' ? 'Go to Dashboard' : 'डैशबोर्ड खोलो'}</span>
               </button>
               <button
@@ -834,7 +834,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-[#5F6B76]/10 text-[#17365D] hover:bg-[#5F6B76]/20 whitespace-nowrap border border-[#DCE3EA] flex items-center gap-1 transition-colors font-bold"
                 title="सेटिंग्स खोलें (Open Settings)"
               >
-                <span>⚙️</span>
+                <Icon name="info" size={12} />
                 <span>{currentLang === 'en' ? 'Open Settings' : 'सेटिंग्स'}</span>
               </button>
               <button
@@ -843,7 +843,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-[#287D73]/10 text-[#287D73] hover:bg-[#287D73]/20 whitespace-nowrap border border-[#287D73]/20 flex items-center gap-1 transition-colors"
                 title="रोडमैप कार्ड बोलकर सुनें"
               >
-                <span>🗺️</span>
+                <Icon name="map" size={12} />
                 <span>{currentLang === 'en' ? 'Read Roadmap' : 'रोडमैप कार्ड'}</span>
               </button>
               <button
@@ -852,7 +852,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-[#245A91]/10 text-[#245A91] hover:bg-[#245A91]/20 whitespace-nowrap border border-[#245A91]/20 flex items-center gap-1 transition-colors"
                 title="पास की नौकरियों के कार्ड सुनें"
               >
-                <span>💼</span>
+                <Icon name="briefcase" size={12} />
                 <span>{currentLang === 'en' ? 'Read Jobs' : 'नौकरियां'}</span>
               </button>
               <button
@@ -861,7 +861,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 whitespace-nowrap border border-purple-200 flex items-center gap-1 transition-colors"
                 title="प्रशिक्षण केंद्र कार्ड सुनें"
               >
-                <span>🎓</span>
+                <Icon name="cap" size={12} />
                 <span>{currentLang === 'en' ? 'Training Centers' : 'प्रशिक्षण'}</span>
               </button>
               <button
@@ -870,7 +870,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 hover:bg-sky-100 whitespace-nowrap border border-sky-200 flex items-center gap-1 transition-colors"
                 title="प्रोफाइल खोलें"
               >
-                <span>👤</span>
+                <Icon name="user" size={12} />
                 <span>{currentLang === 'en' ? 'Profile' : 'प्रोफ़ाइल'}</span>
               </button>
               <button
@@ -879,7 +879,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
                 className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 whitespace-nowrap border border-slate-200 flex items-center gap-1 transition-colors"
                 title="होम पेज खोलें"
               >
-                <span>🏠</span>
+                <Icon name="globe" size={12} />
                 <span>{currentLang === 'en' ? 'Home' : 'होम'}</span>
               </button>
             </div>

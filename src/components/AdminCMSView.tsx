@@ -664,73 +664,80 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
       <div className="flex items-center gap-2 border-b border-[#DCE3EA] overflow-x-auto pb-2 text-xs sm:text-sm font-bold text-[#5F6B76]">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
             activeTab === 'overview'
               ? 'bg-[#17365D] text-white shadow-xs'
               : 'hover:bg-[#F5F7FA] hover:text-[#17365D]'
           }`}
         >
-          📊 Live Intelligence &amp; Analytics
+          <Icon name="target" size={14} />
+          <span>Live Intelligence &amp; Analytics</span>
         </button>
         <button
           onClick={() => setActiveTab('users')}
-          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
             activeTab === 'users'
               ? 'bg-[#17365D] text-white shadow-xs'
               : 'hover:bg-[#F5F7FA] hover:text-[#17365D]'
           }`}
         >
-          👥 User Assessments &amp; Matches ({beneficiaries.length})
+          <Icon name="user" size={14} />
+          <span>User Assessments &amp; Matches ({beneficiaries.length})</span>
         </button>
         <button
           onClick={() => setActiveTab('jobs')}
-          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
             activeTab === 'jobs'
               ? 'bg-[#17365D] text-white shadow-xs'
               : 'hover:bg-[#F5F7FA] hover:text-[#17365D]'
           }`}
         >
-          💼 Jobs &amp; Opportunities ({opportunities.length})
+          <Icon name="briefcase" size={14} />
+          <span>Jobs &amp; Opportunities ({opportunities.length})</span>
         </button>
         <button
           onClick={() => setActiveTab('pathways')}
-          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
             activeTab === 'pathways'
               ? 'bg-[#17365D] text-white shadow-xs'
               : 'hover:bg-[#F5F7FA] hover:text-[#17365D]'
           }`}
         >
-          ⚡ NSQF Skill Pathways ({pathways.length})
+          <Icon name="zap" size={14} />
+          <span>NSQF Skill Pathways ({pathways.length})</span>
         </button>
         <button
           onClick={() => setActiveTab('districts')}
-          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
             activeTab === 'districts'
               ? 'bg-[#17365D] text-white shadow-xs'
               : 'hover:bg-[#F5F7FA] hover:text-[#17365D]'
           }`}
         >
-          🗺️ District Coverage (All India)
+          <Icon name="map" size={14} />
+          <span>District Coverage (All India)</span>
         </button>
         <button
           onClick={() => setActiveTab('media')}
-          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
             activeTab === 'media'
               ? 'bg-[#17365D] text-white shadow-xs'
               : 'hover:bg-[#F5F7FA] hover:text-[#17365D]'
           }`}
         >
-          🖼️ Cloudinary Media &amp; Showcase ({mediaAssets.length})
+          <Icon name="sparkles" size={14} />
+          <span>Cloudinary Media &amp; Showcase ({mediaAssets.length})</span>
         </button>
         <button
           onClick={() => setActiveTab('notifications')}
-          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
             activeTab === 'notifications'
               ? 'bg-[#17365D] text-white shadow-xs'
               : 'hover:bg-[#F5F7FA] hover:text-[#17365D]'
           }`}
         >
-          🔔 Push Notifications &amp; Broadcast
+          <Icon name="volume2" size={14} />
+          <span>Push Notifications &amp; Broadcast</span>
         </button>
       </div>
 
