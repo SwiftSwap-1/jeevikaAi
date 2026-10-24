@@ -35,6 +35,7 @@ export interface BeneficiaryProfile {
   locationAccuracyMeters?: number;
   latitude?: number;
   longitude?: number;
+  phone?: string;
 }
 
 export interface StepQuestion {

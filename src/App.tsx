@@ -348,17 +348,44 @@ export default function App() {
 
   // JeevikaAI-assisted account: new account keeps the profile the person already gave
   const handleAccountCreated = async (_user: AppUser) => {
-    if (profile) {
-      try {
-        await firestoreService.syncLocalProfileToFirestore(profile);
-      } catch (err) {
-        console.warn('Profile sync after account creation failed:', err);
-      }
+    setCurrentUser(_user);
+    let targetProfile = profile;
+    if (!targetProfile) {
+      targetProfile = {
+        name: _user.displayName || 'लाभार्थी',
+        education: '10th pass (Secondary)',
+        skills: 'मोबाइल चलाना, बातचीत',
+        interests: 'डिजिटल सेवाएँ, सिलाई-कढ़ाई',
+        occupation: 'गृहणी / स्वरोजगार इच्छुक',
+        location: activeLocation || 'Maharajganj, Uttar Pradesh',
+        workType: 'Either',
+        mobility: 'Nearby only (within ~10 km)',
+        phone: _user.phone || '',
+      };
+      setProfile(targetProfile);
+      await storageService.saveProfile(targetProfile);
+    } else if (_user.phone && !targetProfile.phone) {
+      targetProfile = { ...targetProfile, phone: _user.phone };
+      setProfile(targetProfile);
+      await storageService.saveProfile(targetProfile);
     }
+
+    try {
+      await firestoreService.saveUserProfile(_user.uid, targetProfile, true, true);
+    } catch (err) {
+      console.warn('Profile sync after account creation failed:', err);
+    }
+
+    notify(
+      currentLang === 'bho'
+        ? `खाता बन गइल! ${_user.phone || ''} खातिर डेटा सुरक्षित बा।`
+        : `खाता बन गया! ${_user.phone || ''} के लिए आपका डेटा सुरक्षित रूप से सहेज लिया गया है।`
+    );
   };
 
-  // Login: bring back the profile saved in the cloud for this account
+  // Login: bring back the profile saved in the cloud for this account and directly open dashboard
   const handleAccountLoggedIn = async (user: AppUser): Promise<boolean> => {
+    setCurrentUser(user);
     try {
       const saved = await firestoreService.getUserProfile(user.uid);
       if (saved && saved.name) {
@@ -366,22 +393,58 @@ export default function App() {
         const restoredProfile = restored as BeneficiaryProfile;
         setProfile(restoredProfile);
         await storageService.saveProfile(restoredProfile);
-        if (restoredProfile.location) setActiveLocation(restoredProfile.location);
+        if (restoredProfile.location) {
+          setActiveLocation(restoredProfile.location);
+          locationIntelligenceService.setActiveLocation(restoredProfile.location);
+        }
+        notify(
+          currentLang === 'bho'
+            ? `स्वागत बा, ${restoredProfile.name}! राउर डैशबोर्ड लोड हो गइल।`
+            : `स्वागत है, ${restoredProfile.name}! आपका डैशबोर्ड लोड हो गया है।`
+        );
         navigateTo('dashboard');
         return true;
       }
       if (profile) {
-        // First login for this account: keep what was entered on this phone
-        await firestoreService.syncLocalProfileToFirestore(profile);
+        // Link what was already entered on this phone to the user in Firestore
+        const linked: BeneficiaryProfile = { ...profile, phone: user.phone || profile.phone };
+        setProfile(linked);
+        await storageService.saveProfile(linked);
+        await firestoreService.saveUserProfile(user.uid, linked, true, true);
+        notify(
+          currentLang === 'bho'
+            ? `लॉगिन सफल! राउर जानकारी सहेजल गइल।`
+            : `लॉगिन सफल! आपकी जानकारी सुरक्षित कर ली गई है।`
+        );
         navigateTo('dashboard');
         return true;
       }
+
+      // Default profile if newly logged in on another device
+      const defaultProf: BeneficiaryProfile = {
+        name: user.displayName || 'लाभार्थी',
+        education: '10th pass (Secondary)',
+        skills: 'मोबाइल चलाना, बातचीत',
+        interests: 'डिजिटल सेवाएँ, सिलाई-कढ़ाई',
+        occupation: 'गृहणी / स्वरोजगार इच्छुक',
+        location: activeLocation || 'Maharajganj, Uttar Pradesh',
+        workType: 'Either',
+        mobility: 'Nearby only (within ~10 km)',
+        phone: user.phone || '',
+      };
+      setProfile(defaultProf);
+      await storageService.saveProfile(defaultProf);
+      await firestoreService.saveUserProfile(user.uid, defaultProf, true, true);
+      notify('लॉगिन सफल! डैशबोर्ड खुल गया है।');
+      navigateTo('dashboard');
+      return true;
     } catch (err) {
       console.warn('Could not load saved profile after login:', err);
+      navigateTo('dashboard');
+      return true;
     }
-    navigateTo('assessment');
-    return false;
   };
+
   const handleLogout = async () => {
     try {
       await authService.logout();
@@ -389,6 +452,9 @@ export default function App() {
       // Ignore
     }
     storageService.clearProfile();
+    try {
+      localStorage.removeItem('jeevika_auth_user_v1');
+    } catch {}
     setProfile(null);
     setCurrentUser(null);
     notify(

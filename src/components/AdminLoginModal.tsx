@@ -116,6 +116,23 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
         )}
 
+        {/* Google 1-Click Login (Recommended for ayushgupt640@gmail.com) */}
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading}
+          className="w-full py-3.5 px-4 rounded-xl border-2 border-[#245A91] bg-white hover:bg-slate-50 text-[#17365D] font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] shadow-xs disabled:opacity-50"
+        >
+          <span className="w-6 h-6 rounded-full bg-[#245A91] text-white text-xs font-black flex items-center justify-center">G</span>
+          <span>Google से 1-क्लिक लॉगिन (Recommended)</span>
+        </button>
+
+        <div className="flex items-center gap-2 text-[11px] text-[#5F6B76]">
+          <span className="flex-1 h-px bg-[#DCE3EA]" />
+          <span>या ईमेल और पासवर्ड दर्ज करें</span>
+          <span className="flex-1 h-px bg-[#DCE3EA]" />
+        </div>
+
         {/* Real Secure Login Form */}
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div>
@@ -126,7 +143,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@jeevika.org"
+              placeholder="ayushgupt640@gmail.com"
               autoComplete="username"
               required
               className="w-full p-2.5 sm:p-3 rounded-xl border border-[#DCE3EA] focus:border-[#245A91] focus:ring-1 focus:ring-[#245A91] focus:outline-none text-[#17365D] font-medium transition-colors"
@@ -163,22 +180,6 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             )}
           </button>
         </form>
-
-        <div className="flex items-center gap-2 text-[11px] text-[#5F6B76]">
-          <span className="flex-1 h-px bg-[#DCE3EA]" />
-          <span>या (or)</span>
-          <span className="flex-1 h-px bg-[#DCE3EA]" />
-        </div>
-
-        <button
-          type="button"
-          onClick={handleGoogle}
-          disabled={loading}
-          className="w-full py-3 rounded-xl border border-[#DCE3EA] bg-white hover:bg-[#F5F7FA] text-[#17365D] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
-        >
-          <span className="w-5 h-5 rounded-full bg-[#245A91] text-white text-[11px] font-extrabold flex items-center justify-center">G</span>
-          <span>Google से लॉगिन करें (Sign in with Google)</span>
-        </button>
 
         <div className="pt-2 border-t border-[#DCE3EA] text-center text-[11px] text-[#5F6B76]">
           <span>JeevikaAI Security System · End-to-End Encrypted</span>

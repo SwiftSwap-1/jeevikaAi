@@ -138,6 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showDistrictSelector, setShowDistrictSelector] = useState(false);
   const [selectedStateIndex, setSelectedStateIndex] = useState(0);
   const [celebratedStageKey, setCelebratedStageKey] = useState<string | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const displayName = profile.name && profile.name.trim() ? profile.name.trim() : dt('beneficiary', L);
   const displayInitial = displayName.charAt(0).toUpperCase();
@@ -525,15 +526,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </section>
 
           {/* Assisted account: JeevikaAI creates the account for people who cannot do it themselves */}
-          {hasAssessment && onOpenAccount && (!currentUser || currentUser.isAnonymous) && (
+          {hasAssessment && onOpenAccount && (!currentUser || currentUser.isAnonymous) && !bannerDismissed && (
             <section
               id="account-banner"
-              className="rounded-2xl border-2 border-[#287D73]/40 bg-[#287D73]/5 p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4"
+              className="relative rounded-2xl border-2 border-[#287D73]/40 bg-[#287D73]/5 p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4"
             >
+              <button
+                onClick={() => setBannerDismissed(true)}
+                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-[#5F6B76] hover:text-[#17365D] flex items-center justify-center text-xs font-bold shadow-xs transition-colors"
+                title="हटाएँ (Dismiss)"
+                aria-label="Dismiss banner"
+              >
+                ✕
+              </button>
               <span className="w-12 h-12 rounded-xl bg-[#287D73] text-white flex items-center justify-center flex-none">
                 <Icon name="user" size={24} />
               </span>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 pr-6 md:pr-0">
                 <h2 className="text-base sm:text-lg font-extrabold text-[#17365D]">{dt('accTitle', L)}</h2>
                 <p className="text-sm text-[#5F6B76] mt-0.5">{dt('accBody', L)}</p>
               </div>

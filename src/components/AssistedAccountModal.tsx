@@ -313,7 +313,16 @@ export const AssistedAccountModal: React.FC<Props> = ({
       (res) => {
         setHeardText(res.transcript);
         const digits = parseSpokenDigits(res.transcript);
-        if (digits) setField(digits);
+        if (digits) {
+          const max = step === 'phone' ? 10 : 4;
+          const nextVal = digits.slice(0, max);
+          setField(nextVal);
+          if (step === 'phone' && nextVal.length === 10) {
+            setIsListening(false);
+          } else if ((step === 'pin' || step === 'pin2') && nextVal.length === 4) {
+            setIsListening(false);
+          }
+        }
         if (res.isFinal) setIsListening(false);
       },
       () => {
@@ -337,12 +346,17 @@ export const AssistedAccountModal: React.FC<Props> = ({
         const user = await authService.registerWithPhone(phone, pinValue, profileName);
         await onCreated(user);
         setDoneText(tx('doneCreate', L));
+        setStep('done');
       } else {
         const user = await authService.loginWithPhone(phone, pinValue);
         const hadData = await onLoggedIn(user);
         setDoneText(tx(hadData ? 'doneLogin' : 'doneLoginEmpty', L));
+        setStep('done');
+        // Auto-navigate directly to dashboard on login
+        setTimeout(() => {
+          onClose();
+        }, 600);
       }
-      setStep('done');
     } catch (err) {
       showError(err instanceof AccountError ? err.kind : 'unknown');
     }
@@ -606,9 +620,9 @@ export const AssistedAccountModal: React.FC<Props> = ({
               )}
               <button
                 onClick={onClose}
-                className="w-full min-h-14 rounded-2xl bg-[#287D73] hover:bg-[#1E6058] text-white text-lg font-extrabold"
+                className="w-full min-h-14 rounded-2xl bg-[#287D73] hover:bg-[#1E6058] text-white text-base font-extrabold shadow-md active:scale-[0.98]"
               >
-                {tx('ok', L)}
+                {L === 'bho' ? 'डैशबोर्ड देखीं (Open Dashboard)' : 'डैशबोर्ड देखें (Open Dashboard)'}
               </button>
             </div>
           )}
