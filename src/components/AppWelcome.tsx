@@ -36,7 +36,7 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
       </div>
 
       {/* Center Card */}
-      <div className="max-w-md w-full bg-white rounded-3xl p-5 sm:p-7 shadow-2xl border border-[#DCE3EA] text-center space-y-4 my-2 flex-shrink-0">
+      <div className="max-w-md w-full bg-white rounded-3xl p-5 sm:p-6 shadow-2xl border border-[#DCE3EA] text-center space-y-3.5 my-2 flex-shrink-0">
         {/* Centered App Icon Mark */}
         <div className="mx-auto flex flex-col items-center space-y-2">
           <div className="w-16 h-16 rounded-2xl bg-[#17365D] text-white flex items-center justify-center shadow-lg border-2 border-[#245A91]">
@@ -52,18 +52,25 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
           </div>
         </div>
 
-        <p className="text-xs text-[#5F6B76] leading-relaxed">
-          {currentLang === 'bho'
-            ? 'बिना कवनो फॉर्म भरले, आवाज से आपन हुनर अउर ट्रेनिंग रोडमैप बनाईं।'
-            : 'बिना कोई फॉर्म भरे, आवाज से अपना हुनर और ट्रेनिंग रोडमैप बनाएं। सुरक्षित खाता और मोबाइल नंबर के साथ।'}
-        </p>
+        {/* App Feature Highlight Text Block */}
+        <div className="p-3 bg-[#F5F7FA] rounded-2xl border border-[#DCE3EA] text-left space-y-1">
+          <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-[#17365D]">
+            <span className="w-2 h-2 rounded-full bg-[#287D73] animate-pulse" />
+            <span>Voice-First AI Assistant · बोलकर संवाद करें</span>
+          </div>
+          <p className="text-[11px] text-[#5F6B76] leading-snug">
+            {currentLang === 'bho'
+              ? 'हिंदी अउर भोजपुरी में बोलकर आपन शिक्षा आ कौशल दर्ज करीं। बिना फॉर्म भरले सीधे आजीविका रोडमैप पावीं।'
+              : 'हिंदी और भोजपुरी में बोलकर अपनी शिक्षा और कौशल दर्ज करें। बिना फॉर्म भरे सीधे आजीविका रोडमैप पाएं।'}
+          </p>
+        </div>
 
         {/* Action Buttons */}
-        <div className="space-y-3 pt-1">
+        <div className="space-y-2.5 pt-1">
           {/* Create Account Button */}
           <button
             onClick={() => onOpenAccount('create')}
-            className="w-full min-h-12 px-6 rounded-2xl bg-[#287D73] hover:bg-[#1E6058] text-white text-sm sm:text-base font-extrabold shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
+            className="w-full min-h-12 px-6 rounded-2xl bg-[#287D73] hover:bg-[#1E6058] text-white text-sm font-extrabold shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
           >
             <span>
               {currentLang === 'bho' ? 'नया खाता बनाईं (Create Account)' : 'खाता बनाएं (Create Account)'}
@@ -73,7 +80,7 @@ export const AppWelcome: React.FC<AppWelcomeProps> = ({
           {/* Login Button */}
           <button
             onClick={() => onOpenAccount('login')}
-            className="w-full min-h-12 px-6 rounded-2xl bg-[#17365D] hover:bg-[#245A91] text-white text-sm sm:text-base font-extrabold shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
+            className="w-full min-h-12 px-6 rounded-2xl bg-[#17365D] hover:bg-[#245A91] text-white text-sm font-extrabold shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
           >
             <span>
               {currentLang === 'bho' ? 'लॉगिन करीं (Log In)' : 'लॉगिन करें (Log In)'}
