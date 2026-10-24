@@ -344,34 +344,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  onOpenAccount('create');
-                }}
-                className="w-full min-h-14 px-4 rounded-2xl bg-[#287D73] text-white text-sm font-extrabold flex items-center justify-between gap-2 shadow-sm active:scale-[0.99]"
-              >
-                <span className="flex items-center gap-2.5 text-left">
-                  <Icon name="user" size={20} />
-                  <span>
-                    {currentLang === 'en'
-                      ? 'JeevikaAI creates your account'
-                      : currentLang === 'hin'
-                      ? 'JeevikaAI aapka account banayega'
-                      : currentLang === 'bho'
-                      ? 'जीविका एआई रउआ खाता बनाई'
-                      : 'जीविका एआई आपका खाता बनाएगा'}
-                  </span>
-                </span>
-                <Icon name="mic" size={18} />
-              </button>
-            )}
-            {onOpenAccount && (!currentUser || currentUser.isAnonymous) && (
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
                   onOpenAccount('login');
                 }}
-                className="w-full min-h-11 text-sm font-bold text-[#245A91] underline underline-offset-4"
+                className="w-full min-h-12 px-4 rounded-xl bg-[#287D73] text-white text-xs font-extrabold flex items-center justify-between gap-2 shadow-sm active:scale-[0.99]"
               >
-                {currentLang === 'en' ? 'Already have an account? Log in' : currentLang === 'hin' ? 'Pehle se account hai? Login' : 'पहले से खाता है? लॉगिन करें'}
+                <span className="flex items-center gap-2">
+                  <Icon name="user" size={16} />
+                  <span>खाता / लॉगिन (Account / Login)</span>
+                </span>
+                <Icon name="arrowR" size={14} />
               </button>
             )}
 

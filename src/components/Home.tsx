@@ -38,8 +38,8 @@ export const Home: React.FC<HomeProps> = ({
   const previewJobs = rankJobs(DEMO, previewPaths).slice(0, 2);
 
   const handleStartVoice = () => {
-    if (onOpenAccount) {
-      onOpenAccount('create');
+    if (onStartVoiceAssessment) {
+      onStartVoiceAssessment(currentLang);
     } else {
       go('assessment');
     }
