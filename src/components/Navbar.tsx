@@ -163,6 +163,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
+              onClick={() => handleNav('business-upload')}
+              className={`px-3 py-2 rounded-lg transition-colors bg-[#287D73]/10 text-[#287D73] font-extrabold flex items-center gap-1 ${
+                currentView === 'business-upload' ? 'bg-[#287D73] text-white' : ''
+              }`}
+            >
+              <span>+ Add Product</span>
+            </button>
+
+            <button
               onClick={() => handleNav('faq')}
               className={`px-3 py-2 rounded-lg transition-colors hover:text-[#17365D] ${
                 currentView === 'faq' ? 'text-[#245A91] font-extrabold' : ''
@@ -512,6 +521,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <span>सहेजे गए अवसर (Saved Items)</span>
+                <Icon name="chev" size={12} className="opacity-40" />
+              </button>
+              <button
+                onClick={() => handleNav('business-upload')}
+                className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between bg-[#287D73]/10 text-[#287D73] font-bold ${
+                  currentView === 'business-upload' ? 'bg-[#287D73] text-white' : ''
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Icon name="check" size={14} />
+                  <span>+ अपना उत्पाद जोड़ें (Seller Portal)</span>
+                </span>
                 <Icon name="chev" size={12} className="opacity-40" />
               </button>
               <button
