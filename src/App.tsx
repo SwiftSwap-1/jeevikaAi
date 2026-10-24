@@ -334,9 +334,13 @@ export default function App() {
 
   const handleStartVoiceAssessment = (lang: SupportedLanguage) => {
     setCurrentLang(lang);
-    setAutoStartAssessment(true);
-    setCurrentView('assessment');
     setShowVoiceStartModal(false);
+    if (!currentUser || currentUser.isAnonymous) {
+      setAccountMode('create');
+    } else {
+      setAutoStartAssessment(true);
+      setCurrentView('assessment');
+    }
   };
 
   // JeevikaAI-assisted account: new account keeps the profile the person already gave
@@ -371,9 +375,12 @@ export default function App() {
 
     notify(
       currentLang === 'bho'
-        ? `खाता बन गइल! ${_user.phone || ''} खातिर डेटा सुरक्षित बा।`
-        : `खाता बन गया! ${_user.phone || ''} के लिए आपका डेटा सुरक्षित रूप से सहेज लिया गया है।`
+        ? `खाता बन गइल! अब मूल्यांकन शुरू होत बा...`
+        : `खाता बन गया! अब मूल्यांकन शुरू हो रहा है...`
     );
+    setAccountMode(null);
+    setAutoStartAssessment(true);
+    navigateTo('assessment');
   };
 
   // Login: bring back the profile saved in the cloud for this account and directly open dashboard
