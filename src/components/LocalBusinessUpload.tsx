@@ -51,7 +51,7 @@ export const LocalBusinessUpload: React.FC<LocalBusinessUploadProps> = ({
     const mine = all.filter(
       (p) => p.userId === currentUser.uid || p.artisanName?.toLowerCase() === (currentUser.displayName || '').toLowerCase()
     );
-    setMyProducts(mine.length > 0 ? mine : all.slice(0, 2)); // fallback demo if none matched yet
+    setMyProducts(mine);
     setLoadingMyProducts(false);
   };
 
