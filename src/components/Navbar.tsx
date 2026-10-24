@@ -162,23 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               Saved
             </button>
 
-            <button
-              onClick={() => handleNav('business-upload')}
-              className={`px-3 py-2 rounded-lg transition-colors bg-[#287D73]/10 text-[#287D73] font-extrabold flex items-center gap-1 ${
-                currentView === 'business-upload' ? 'bg-[#287D73] text-white' : ''
-              }`}
-            >
-              <span>+ Add Product</span>
-            </button>
 
-            <button
-              onClick={() => handleNav('seller-analytics')}
-              className={`px-3 py-2 rounded-lg transition-colors bg-[#17365D]/10 text-[#17365D] font-extrabold flex items-center gap-1 ${
-                currentView === 'seller-analytics' ? 'bg-[#17365D] text-white' : ''
-              }`}
-            >
-              <span>📊 Analytics</span>
-            </button>
 
             <button
               onClick={() => handleNav('faq')}
