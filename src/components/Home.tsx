@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Icon } from './Icons';
 import { DEMO, PATHWAYS } from '../data/mockData';
 import { evaluatePathway, rankJobs } from '../services/recommendationEngine';
 import { AppView, SupportedLanguage } from '../types';
 import { PWAInstallStatusButton } from './PWAInstallStatusButton';
-import { VoiceStartModal } from './VoiceStartModal';
 import { HeroCarousel } from './HeroCarousel';
 import { SkillTrainingGallery } from './SkillTrainingGallery';
 import { LocalBusinessShowcase } from './LocalBusinessShowcase';
@@ -39,13 +38,8 @@ export const Home: React.FC<HomeProps> = ({
   const previewJobs = rankJobs(DEMO, previewPaths).slice(0, 2);
 
   const handleStartVoice = () => {
-    setShowVoiceModal(true);
-  };
-
-  const handleConfirmVoice = (lang: SupportedLanguage) => {
-    setShowVoiceModal(false);
-    if (onStartVoiceAssessment) {
-      onStartVoiceAssessment(lang);
+    if (onOpenAccount) {
+      onOpenAccount('create');
     } else {
       go('assessment');
     }
