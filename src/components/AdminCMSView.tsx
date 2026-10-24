@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Icon } from './Icons';
-import { Opportunity, Pathway, BeneficiaryProfile, AppView } from '../types';
+import { Opportunity, Pathway, BeneficiaryProfile, AppView, MediaAssetRecord, ShowcaseProduct } from '../types';
 import { JOBS, PATHWAYS, DEMO } from '../data/mockData';
 import { storageService } from '../services/storageService';
 import { AppUser, isAdminUser, contentService } from '../services/firebase';
+import { mediaStorageService, uploadToCloudinary } from '../services/cloudinaryService';
 
 interface AdminCMSViewProps {
   currentUser?: AppUser | null;
@@ -168,11 +169,82 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
   const isAdmin = isAdminUser(currentUser);
 
   // Navigation Tabs inside Admin Portal
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'jobs' | 'pathways' | 'districts' | 'notifications'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'jobs' | 'pathways' | 'districts' | 'media' | 'notifications'>('overview');
 
   // Location Filter (Whole India vs States)
   const [selectedStateFilter, setSelectedStateFilter] = useState<string>('All India');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Cloudinary Media & Showcase State
+  const [mediaAssets, setMediaAssets] = useState<MediaAssetRecord[]>([]);
+  const [showcaseProducts, setShowcaseProducts] = useState<ShowcaseProduct[]>([]);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string>('');
+  const [mediaTitle, setMediaTitle] = useState('');
+  const [mediaFolder, setMediaFolder] = useState<string>('banner');
+  const [mediaUploading, setMediaUploading] = useState<boolean>(false);
+  const [mediaUploadProgress, setMediaUploadProgress] = useState<number>(0);
+
+  const loadMediaAndShowcase = async () => {
+    const assets = await mediaStorageService.getMediaAssets();
+    setMediaAssets(assets);
+    const prods = await mediaStorageService.getShowcaseProducts();
+    setShowcaseProducts(prods);
+  };
+
+  useEffect(() => {
+    loadMediaAndShowcase();
+  }, []);
+
+  const handleUploadNewMedia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mediaFile || !mediaTitle.trim()) {
+      onNotify('कृपया तस्वीर और शीर्षक दर्ज करें।');
+      return;
+    }
+    setMediaUploading(true);
+    setMediaUploadProgress(20);
+    try {
+      const url = await uploadToCloudinary(mediaFile, mediaFolder, (pct) => {
+        setMediaUploadProgress(Math.max(20, pct));
+      });
+      await mediaStorageService.saveMediaAsset({
+        url,
+        folder: mediaFolder,
+        name: mediaTitle.trim(),
+        tags: [mediaFolder, 'admin-uploaded'],
+        used: 1,
+        time: Date.now(),
+        createdAt: new Date().toISOString(),
+      });
+      onNotify('मीडिया तस्वीर Cloudinary पर सफलतापूर्वक अपलोड व सहेज ली गई!');
+      setMediaFile(null);
+      setMediaPreview('');
+      setMediaTitle('');
+      loadMediaAndShowcase();
+    } catch (err: any) {
+      onNotify('अपलोड विफल: ' + err.message);
+    } finally {
+      setMediaUploading(false);
+      setMediaUploadProgress(0);
+    }
+  };
+
+  const handleDeleteMedia = async (id: string) => {
+    if (confirm('Are you sure you want to delete this media asset?')) {
+      await mediaStorageService.deleteMediaAsset(id);
+      onNotify('Media asset deleted.');
+      loadMediaAndShowcase();
+    }
+  };
+
+  const handleDeleteShowcase = async (id: string) => {
+    if (confirm('Are you sure you want to remove this showcase product?')) {
+      await mediaStorageService.deleteShowcaseProduct(id);
+      onNotify('Product removed from showcase.');
+      loadMediaAndShowcase();
+    }
+  };
 
   // Opportunities / Jobs State
   const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
@@ -639,6 +711,16 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
           }`}
         >
           🗺️ District Coverage (All India)
+        </button>
+        <button
+          onClick={() => setActiveTab('media')}
+          className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+            activeTab === 'media'
+              ? 'bg-[#17365D] text-white shadow-xs'
+              : 'hover:bg-[#F5F7FA] hover:text-[#17365D]'
+          }`}
+        >
+          🖼️ Cloudinary Media &amp; Showcase ({mediaAssets.length})
         </button>
         <button
           onClick={() => setActiveTab('notifications')}
@@ -1151,6 +1233,171 @@ export const AdminCMSView: React.FC<AdminCMSViewProps> = ({
                 <Icon name="bell" size={16} />
                 <span>{notifSending ? 'Broadcasting...' : '🚀 Push Notification Broadcast'}</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== TAB: CLOUDINARY MEDIA & SHOWCASE CMS ===================== */}
+      {activeTab === 'media' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Upload Box */}
+          <div className="bg-white border border-[#DCE3EA] rounded-2xl p-6 shadow-xs space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-[#17365D]">
+                Cloudinary Media Uploader &amp; CMS (क्लाउडिनरी मीडिया प्रबंधक)
+              </h3>
+              <p className="text-xs text-[#5F6B76]">
+                Upload banner slides, training gallery visuals, or showcase product images using Cloudinary (`kvyah2au`, preset `jeevikaai`).
+              </p>
+            </div>
+
+            <form onSubmit={handleUploadNewMedia} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block font-bold text-[#17365D] mb-1">Image File *</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setMediaFile(e.target.files[0]);
+                        setMediaPreview(URL.createObjectURL(e.target.files[0]));
+                      }
+                    }}
+                    required
+                    className="w-full text-xs text-slate-600 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#17365D] file:text-white cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#17365D] mb-1">Target Section / Folder *</label>
+                  <select
+                    value={mediaFolder}
+                    onChange={(e) => setMediaFolder(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-[#DCE3EA] bg-white text-[#17365D] font-semibold"
+                  >
+                    <option value="banner">Hero Banner Slider (होम बैनर)</option>
+                    <option value="training">Skill Training Gallery (कौशल गैलरी)</option>
+                    <option value="showcase">Local Business Showcase (उत्पाद प्रदर्शनी)</option>
+                    <option value="job">Job &amp; Opportunities (नौकरी/प्रशिक्षण)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-[#17365D] mb-1">Title / Caption *</label>
+                  <input
+                    type="text"
+                    value={mediaTitle}
+                    onChange={(e) => setMediaTitle(e.target.value)}
+                    placeholder="e.g. सिलाई प्रशिक्षण केंद्र - महाराजगंज"
+                    required
+                    className="w-full p-2.5 rounded-xl border border-[#DCE3EA] text-[#17365D] font-semibold"
+                  />
+                </div>
+              </div>
+
+              {mediaPreview && (
+                <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border border-[#DCE3EA]">
+                  <img src={mediaPreview} alt="Preview" className="w-24 h-24 object-cover rounded-xl" />
+                  <div>
+                    <div className="font-bold text-[#17365D]">Selected Image Ready for Cloudinary Upload</div>
+                    <div className="text-[11px] text-[#5F6B76]">{mediaFile?.name}</div>
+                  </div>
+                </div>
+              )}
+
+              {mediaUploading && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px] font-bold text-[#287D73]">
+                    <span>Uploading to Cloudinary (kvyah2au)...</span>
+                    <span>{mediaUploadProgress}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                    <div className="h-full bg-[#287D73] transition-all" style={{ width: `${mediaUploadProgress}%` }} />
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={mediaUploading}
+                className="px-6 py-3 rounded-xl bg-[#287D73] hover:bg-[#1E6058] text-white font-extrabold shadow-md disabled:opacity-50"
+              >
+                {mediaUploading ? 'Uploading...' : '☁️ Upload & Publish via Cloudinary'}
+              </button>
+            </form>
+          </div>
+
+          {/* Uploaded Media Assets Grid */}
+          <div className="bg-white border border-[#DCE3EA] rounded-2xl p-6 shadow-xs space-y-4">
+            <h3 className="text-base font-bold text-[#17365D]">
+              All Uploaded Media Assets ({mediaAssets.length})
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {mediaAssets.map((m) => (
+                <div key={m.id} className="rounded-xl border border-[#DCE3EA] overflow-hidden bg-slate-50 flex flex-col">
+                  <div className="h-40 bg-slate-200 relative">
+                    <img src={m.url} alt={m.name} className="w-full h-full object-cover" />
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-extrabold bg-black/60 text-white uppercase">
+                      {m.folder}
+                    </span>
+                  </div>
+                  <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
+                    <div>
+                      <div className="font-bold text-xs text-[#17365D] line-clamp-1">{m.name}</div>
+                      <div className="text-[10px] text-slate-500 truncate mt-0.5 font-mono">{m.url}</div>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(m.url);
+                          onNotify('Image URL copied to clipboard!');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-xs font-bold text-[#17365D]"
+                      >
+                        Copy URL
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMedia(m.id)}
+                        className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-xs font-bold text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Local Business Showcase Products Management */}
+          <div className="bg-white border border-[#DCE3EA] rounded-2xl p-6 shadow-xs space-y-4">
+            <h3 className="text-base font-bold text-[#17365D]">
+              Local Business Showcase Products ({showcaseProducts.length})
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {showcaseProducts.map((p) => (
+                <div key={p.id} className="rounded-xl border border-[#DCE3EA] overflow-hidden bg-white flex flex-col">
+                  <div className="h-36 bg-slate-100 relative">
+                    <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-extrabold bg-black/60 text-white">
+                      {p.category}
+                    </span>
+                  </div>
+                  <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
+                    <div>
+                      <div className="font-bold text-xs text-[#17365D] line-clamp-1">{p.title}</div>
+                      <div className="text-[11px] text-[#5F6B76]">{p.artisanName} · {p.location}</div>
+                      <div className="text-xs font-extrabold text-[#287D73] mt-1">{p.price}</div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteShowcase(p.id)}
+                      className="w-full py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition-colors"
+                    >
+                      Delete Showcase Item
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
