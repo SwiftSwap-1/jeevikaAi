@@ -252,22 +252,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
-            {/* Prominent Saved User Profile & Red Logout Button at Top */}
+            {/* Prominent Red Logout Button at Top */}
             {(profileName || currentUser) && (
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <button
-                  onClick={() => handleNav('profile')}
-                  className="flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-slate-100 hover:bg-slate-200 border border-[#DCE3EA] text-[#17365D] max-w-[90px] xxs:max-w-[125px] sm:max-w-[160px] transition-colors"
-                  title="प्रोफ़ाइल देखें (View Profile)"
-                >
-                  <div className="w-5 h-5 rounded-full bg-[#17365D] text-white flex items-center justify-center font-extrabold text-[10px] flex-shrink-0">
-                    {(profileName || currentUser?.displayName || 'U').charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-[11px] font-extrabold truncate">
-                    {profileName || currentUser?.displayName || 'प्रोफ़ाइल'}
-                  </span>
-                </button>
-
                 <button
                   onClick={onLogout}
                   className="px-2.5 py-1.5 rounded-xl bg-[#9E2A2B] hover:bg-[#7E1F20] text-white text-[11px] sm:text-xs font-extrabold transition-all shadow-xs flex items-center gap-1 active:scale-95 flex-shrink-0"

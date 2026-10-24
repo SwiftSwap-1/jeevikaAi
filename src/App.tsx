@@ -353,52 +353,27 @@ export default function App() {
     }
   };
 
-  // JeevikaAI-assisted account: new account keeps the profile the person already gave
+  // JeevikaAI-assisted account: new account requires completing the voice assessment profile
   const handleAccountCreated = async (_user: AppUser) => {
     setCurrentUser(_user);
-    let targetProfile = profile;
-    if (!targetProfile) {
-      targetProfile = {
-        name: _user.displayName || 'लाभार्थी',
-        education: '10th pass (Secondary)',
-        skills: 'मोबाइल चलाना, बातचीत',
-        interests: 'डिजिटल सेवाएँ, सिलाई-कढ़ाई',
-        occupation: 'गृहणी / स्वरोजगार इच्छुक',
-        location: activeLocation || 'Maharajganj, Uttar Pradesh',
-        workType: 'Either',
-        mobility: 'Nearby only (within ~10 km)',
-        phone: _user.phone || '',
-      };
-      setProfile(targetProfile);
-      await storageService.saveProfile(targetProfile);
-    } else if (_user.phone && !targetProfile.phone) {
-      targetProfile = { ...targetProfile, phone: _user.phone };
-      setProfile(targetProfile);
-      await storageService.saveProfile(targetProfile);
-    }
-
-    try {
-      await firestoreService.saveUserProfile(_user.uid, targetProfile, true, true);
-    } catch (err) {
-      console.warn('Profile sync after account creation failed:', err);
-    }
-
+    setProfile(null);
+    storageService.clearProfile();
     notify(
       currentLang === 'bho'
-        ? `खाता बन गइल! अब मूल्यांकन शुरू होत बा...`
-        : `खाता बन गया! अब मूल्यांकन शुरू हो रहा है...`
+        ? `खाता बन गइल! अब आपन हुनर के मूल्यांकन शुरू करीं।`
+        : `खाता बन गया! अब अपने हुनर का मूल्यांकन शुरू करें।`
     );
     setAccountMode(null);
     setAutoStartAssessment(true);
     navigateTo('assessment');
   };
 
-  // Login: bring back the profile saved in the cloud for this account and directly open dashboard
+  // Login: check if user has completed their profile assessment, otherwise redirect to assessment
   const handleAccountLoggedIn = async (user: AppUser): Promise<boolean> => {
     setCurrentUser(user);
     try {
       const saved = await firestoreService.getUserProfile(user.uid);
-      if (saved && saved.name) {
+      if (saved && saved.name && saved.skills && saved.education) {
         const { consentSaved: _c, updatedAt: _u, ...restored } = saved as any;
         const restoredProfile = restored as BeneficiaryProfile;
         setProfile(restoredProfile);
@@ -415,43 +390,27 @@ export default function App() {
         navigateTo('dashboard');
         return true;
       }
-      if (profile) {
-        // Link what was already entered on this phone to the user in Firestore
-        const linked: BeneficiaryProfile = { ...profile, phone: user.phone || profile.phone };
-        setProfile(linked);
-        await storageService.saveProfile(linked);
-        await firestoreService.saveUserProfile(user.uid, linked, true, true);
-        notify(
-          currentLang === 'bho'
-            ? `लॉगिन सफल! राउर जानकारी सहेजल गइल।`
-            : `लॉगिन सफल! आपकी जानकारी सुरक्षित कर ली गई है।`
-        );
-        navigateTo('dashboard');
-        return true;
-      }
 
-      // Default profile if newly logged in on another device
-      const defaultProf: BeneficiaryProfile = {
-        name: user.displayName || 'लाभार्थी',
-        education: '10th pass (Secondary)',
-        skills: 'मोबाइल चलाना, बातचीत',
-        interests: 'डिजिटल सेवाएँ, सिलाई-कढ़ाई',
-        occupation: 'गृहणी / स्वरोजगार इच्छुक',
-        location: activeLocation || 'Maharajganj, Uttar Pradesh',
-        workType: 'Either',
-        mobility: 'Nearby only (within ~10 km)',
-        phone: user.phone || '',
-      };
-      setProfile(defaultProf);
-      await storageService.saveProfile(defaultProf);
-      await firestoreService.saveUserProfile(user.uid, defaultProf, true, true);
-      notify('लॉगिन सफल! डैशबोर्ड खुल गया है।');
-      navigateTo('dashboard');
-      return true;
+      // If profile / skills / assessment are missing, redirect to Voice Assessment!
+      setProfile(null);
+      storageService.clearProfile();
+      notify(
+        currentLang === 'bho'
+          ? `लॉगिन सफल! अब आपन हुनर मूल्यांकन पूरा करीं।`
+          : `लॉगिन सफल! अब अपना हुनर मूल्यांकन (Voice Assessment) पूरा करें।`
+      );
+      setAccountMode(null);
+      setAutoStartAssessment(true);
+      navigateTo('assessment');
+      return false;
     } catch (err) {
       console.warn('Could not load saved profile after login:', err);
-      navigateTo('dashboard');
-      return true;
+      setProfile(null);
+      storageService.clearProfile();
+      setAccountMode(null);
+      setAutoStartAssessment(true);
+      navigateTo('assessment');
+      return false;
     }
   };
 
