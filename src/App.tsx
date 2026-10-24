@@ -335,7 +335,8 @@ export default function App() {
   const handleStartVoiceAssessment = (lang: SupportedLanguage) => {
     setCurrentLang(lang);
     setShowVoiceStartModal(false);
-    if (!currentUser || currentUser.isAnonymous) {
+    const isLogged = (currentUser && !currentUser.isAnonymous) || Boolean(profile);
+    if (!isLogged) {
       setAccountMode('create');
     } else {
       setAutoStartAssessment(true);
