@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Icon } from './Icons';
 import { DEMO, PATHWAYS } from '../data/mockData';
 import { evaluatePathway, rankJobs } from '../services/recommendationEngine';
@@ -33,7 +33,6 @@ export const Home: React.FC<HomeProps> = ({
   userPhone,
   userLocation,
 }) => {
-  const [showVoiceModal, setShowVoiceModal] = useState<boolean>(false);
   const previewPaths = PATHWAYS.map((p) => evaluatePathway(p, DEMO)).sort((a, b) => b.score - a.score);
   const previewJobs = rankJobs(DEMO, previewPaths).slice(0, 2);
 
@@ -71,14 +70,6 @@ export const Home: React.FC<HomeProps> = ({
 
   return (
     <main>
-      {/* Voice Start Confirmation Popup */}
-      <VoiceStartModal
-        isOpen={showVoiceModal}
-        currentLang={currentLang}
-        onClose={() => setShowVoiceModal(false)}
-        onConfirm={handleConfirmVoice}
-      />
-
       {/* Civic White & Navy Hero Section */}
       <section className="bg-white border-b border-[#DCE3EA] py-12 md:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
