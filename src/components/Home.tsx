@@ -10,6 +10,7 @@ interface HomeProps {
   go: (view: AppView, sectionId?: string) => void;
   onLoadDemo: () => void;
   onStartVoiceAssessment?: (lang: SupportedLanguage) => void;
+  onOpenAccount?: (mode: 'create' | 'login') => void;
   currentLang?: SupportedLanguage;
 }
 
@@ -17,6 +18,7 @@ export const Home: React.FC<HomeProps> = ({
   go,
   onLoadDemo,
   onStartVoiceAssessment,
+  onOpenAccount,
   currentLang = 'hi',
 }) => {
   const [showVoiceModal, setShowVoiceModal] = useState<boolean>(false);
@@ -109,6 +111,15 @@ export const Home: React.FC<HomeProps> = ({
                   <Icon name="arrowR" size={16} />
                 </button>
               </div>
+
+              {onOpenAccount && (
+                <button
+                  onClick={() => onOpenAccount('login')}
+                  className="min-h-11 text-sm font-bold text-[#245A91] underline underline-offset-4 text-left"
+                >
+                  पहले से खाता है? लॉगिन करें (Already registered? Log in)
+                </button>
+              )}
 
               {/* Install App Button Checking Device Installation Status */}
               <div className="pt-1">

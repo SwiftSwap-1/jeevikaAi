@@ -7,15 +7,30 @@ import {
   AppView,
   SummaryModalData,
   LocationLivelihoodData,
-  LocationAccuracyLevel,
 } from '../types';
-import { rankPaths, rankJobs, splitList, kmLabel, buildSummary, slug } from '../services/recommendationEngine';
-import { STAGE_TITLES } from '../data/mockData';
+import { AppUser } from '../services/firebase';
+import { rankPaths, rankJobs, buildSummary, slug } from '../services/recommendationEngine';
+import { EDU, WORK, MOB } from '../data/mockData';
 import { speechService } from '../services/speechService';
 import { storageService } from '../services/storageService';
 import { locationIntelligenceService, POPULAR_INDIAN_REGIONS } from '../services/locationIntelligenceService';
-import { LocationAccuracyBadge } from './LocationAccuracyBadge';
-import { DistrictMiniMap } from './DistrictMiniMap';
+import {
+  dt,
+  optionLabel,
+  pathwayName,
+  pathwayRole,
+  stageText,
+  STAGE_TITLES_L10N,
+  localizeDuration,
+  fitText,
+  factorLabel,
+  factorNote,
+  opportunityTypeLabel,
+  distanceLabel,
+  schemeName,
+  FALLBACK_SCHEMES,
+  isEnglishLike,
+} from '../services/dashboardLocale';
 
 interface DashboardProps {
   profile: BeneficiaryProfile;
@@ -30,14 +45,17 @@ interface DashboardProps {
   locationData?: LocationLivelihoodData | null;
   onRefreshLocationAi?: () => void;
   isRefreshingLocationData?: boolean;
+  shortlist?: Record<string, boolean>;
+  onShortlistToggle?: (id: string) => void;
+  currentUser?: AppUser | null;
+  onOpenAccount?: (mode: 'create' | 'login') => void;
 }
 
-// Circular Fit Score Gauge using civic teal
-const Ring: React.FC<{ value: number; size?: number }> = ({ value, size = 64 }) => {
+const Ring: React.FC<{ value: number; size?: number; label: string }> = ({ value, size = 64, label }) => {
   const r = 26;
   const c = 2 * Math.PI * r;
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label={`Fit score ${value} out of 100`} className="flex-none">
+    <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label={`${label}: ${value}/100`} className="flex-none">
       <circle cx="32" cy="32" r={r} fill="none" strokeWidth="5" className="stroke-[#DCE3EA]" />
       <circle
         cx="32"
@@ -51,19 +69,35 @@ const Ring: React.FC<{ value: number; size?: number }> = ({ value, size = 64 }) 
         transform="rotate(-90 32 32)"
         className="stroke-[#287D73]"
       />
-      <text
-        x="32"
-        y="38"
-        textAnchor="middle"
-        fontSize="16"
-        fontWeight="800"
-        className="fill-[#17365D] font-['Bricolage_Grotesque']"
-      >
+      <text x="32" y="38" textAnchor="middle" fontSize="16" fontWeight="800" className="fill-[#17365D]">
         {value}
       </text>
     </svg>
   );
 };
+
+const SectionHead: React.FC<{ tag?: string; title: string; right?: React.ReactNode; icon?: string }> = ({ tag, title, right, icon }) => (
+  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4">
+    <div className="flex items-start gap-3 min-w-0">
+      {icon && (
+        <span className="mt-0.5 w-10 h-10 rounded-xl bg-[#17365D] text-white flex items-center justify-center flex-none">
+          <Icon name={icon} size={20} />
+        </span>
+      )}
+      <div className="min-w-0">
+        {tag && <div className="text-[11px] uppercase font-extrabold tracking-widest text-[#245A91]">{tag}</div>}
+        <h2 className="text-xl sm:text-2xl font-extrabold text-[#17365D] leading-tight">{title}</h2>
+      </div>
+    </div>
+    {right}
+  </div>
+);
+
+const Panel: React.FC<{ id?: string; children: React.ReactNode; className?: string }> = ({ id, children, className = '' }) => (
+  <section id={id} className={`bg-white border border-[#DCE3EA] rounded-2xl shadow-xs p-4 sm:p-6 scroll-mt-28 ${className}`}>
+    {children}
+  </section>
+);
 
 export const Dashboard: React.FC<DashboardProps> = ({
   profile,
@@ -78,7 +112,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   locationData,
   onRefreshLocationAi,
   isRefreshingLocationData = false,
+  shortlist: shortlistProp,
+  onShortlistToggle,
+  currentUser,
+  onOpenAccount,
 }) => {
+  const L = currentLang;
   const rankedPaths = useMemo(() => rankPaths(profile), [profile]);
   const topPaths = rankedPaths.slice(0, 3);
   const jobs = useMemo(
@@ -90,28 +129,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [selectedPathId, setSelectedPathId] = useState<string>(topPaths[0]?.id || rankedPaths[0]?.id);
   const [doneStages, setDoneStages] = useState<Record<string, boolean>>(() => storageService.loadProgress());
   const [jobFilter, setJobFilter] = useState<'All' | 'Job' | 'Self-employment'>('All');
-  const [shortlist, setShortlist] = useState<Record<string, boolean>>(() => storageService.loadShortlist());
+  const [localShortlist, setLocalShortlist] = useState<Record<string, boolean>>(() => storageService.loadShortlist());
+  const shortlist = shortlistProp ?? localShortlist;
   const [isReadingRoadmap, setIsReadingRoadmap] = useState(false);
-  const [showProfileDetails, setShowProfileDetails] = useState<boolean>(false);
+  const [readingJobId, setReadingJobId] = useState<string | null>(null);
+  const [showProfileDetails, setShowProfileDetails] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [showDistrictSelector, setShowDistrictSelector] = useState(false);
+  const [selectedStateIndex, setSelectedStateIndex] = useState(0);
+  const [celebratedStageKey, setCelebratedStageKey] = useState<string | null>(null);
 
-  // Location intelligence state
-  const [isDetectingLocation, setIsDetectingLocation] = useState<boolean>(false);
-  const [showDistrictSelector, setShowDistrictSelector] = useState<boolean>(false);
-  const [selectedStateIndex, setSelectedStateIndex] = useState<number>(0);
-
-  const displayName = profile.name && profile.name.trim() ? profile.name.trim() : 'लाभार्थी (Beneficiary)';
+  const displayName = profile.name && profile.name.trim() ? profile.name.trim() : dt('beneficiary', L);
   const displayInitial = displayName.charAt(0).toUpperCase();
+  const locationLabel = profile.location || locationData?.district || '';
+  const districtShort = (locationData?.district || locationLabel.split(',')[0] || '').trim();
 
-  // Active Accuracy and Confidence level computation
   const currentAccuracy = useMemo(() => {
     if (profile.locationAccuracy && profile.locationConfidence) {
       return {
         level: profile.locationAccuracy,
         confidenceScore: profile.locationConfidence,
         accuracyMeters: profile.locationAccuracyMeters,
-        latitude: profile.latitude,
-        longitude: profile.longitude,
-        source: 'gps' as const,
+        locality: undefined as string | undefined,
       };
     }
     if (locationData?.accuracyLevel && locationData?.confidenceScore) {
@@ -119,62 +158,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
         level: locationData.accuracyLevel,
         confidenceScore: locationData.confidenceScore,
         accuracyMeters: locationData.accuracyMeters,
-        latitude: locationData.latitude,
-        longitude: locationData.longitude,
-        source: 'gps' as const,
+        locality: undefined as string | undefined,
       };
     }
-    return locationIntelligenceService.getLocationAccuracy();
-  }, [profile.locationAccuracy, profile.locationConfidence, profile.locationAccuracyMeters, profile.latitude, profile.longitude, locationData]);
+    const a = locationIntelligenceService.getLocationAccuracy();
+    return { level: a.level, confidenceScore: a.confidenceScore, accuracyMeters: a.accuracyMeters, locality: a.locality };
+  }, [profile.locationAccuracy, profile.locationConfidence, profile.locationAccuracyMeters, locationData]);
 
   const handleDetectLocation = async () => {
     if (isDetectingLocation) return;
     setIsDetectingLocation(true);
-    onNotify(
-      currentLang === 'bho'
-        ? 'जीपीएस से स्थान खोजल जा रहल बा... (Detecting Location)'
-        : currentLang === 'en'
-        ? 'Detecting your city/district via Geolocation API...'
-        : 'जीपीएस द्वारा आपके जिले/स्थान का पता लगाया जा रहा है...'
-    );
-
+    onNotify(dt('detecting', L));
     try {
       const res = await locationIntelligenceService.detectGpsLocation();
       if (res && res.location) {
-        const updated: BeneficiaryProfile = {
+        onUpdateProfile?.({
           ...profile,
           location: res.location,
           locationAccuracy: res.accuracyLevel,
           locationConfidence: res.confidenceScore,
           locationAccuracyMeters: res.accuracyMeters,
-          latitude: res.latitude,
-          longitude: res.longitude,
-        };
-        if (onUpdateProfile) {
-          onUpdateProfile(updated);
-        }
-        if (onLocationChange) {
-          onLocationChange(res.location);
-        }
-        onNotify(
-          currentLang === 'bho'
-            ? `स्थान मिल गइल: ${res.location} (${res.accuracyLevel} परिशुद्धता · ${res.confidenceScore}% विश्वास)`
-            : currentLang === 'en'
-            ? `Location detected: ${res.location} (${res.accuracyLevel} · ${res.confidenceScore}% confidence)`
-            : `स्थान प्राप्त हुआ: ${res.location} (${res.accuracyLevel} परिशुद्धता · ${res.confidenceScore}% विश्वास)`
-        );
+        });
+        onLocationChange?.(res.location);
+        onNotify(`📍 ${res.location} (${res.confidenceScore}%)`);
       }
     } catch (err: any) {
-      console.warn('Geolocation detection error:', err);
-      const isDenied = err?.code === 1 || err?.message?.toLowerCase().includes('denied');
+      const isDenied = err?.code === 1 || err?.message?.toLowerCase?.().includes('denied');
       onNotify(
         isDenied
-          ? (currentLang === 'bho'
-              ? 'स्थान अनुमति अस्वीकृत बा। कृपया नीचे से जिला चुनीं।'
-              : 'स्थान अनुमति अस्वीकृत है। कृपया नीचे से जिला चुनें।')
-          : (currentLang === 'bho'
-              ? 'स्थान खोजे में समस्या आइल। कृपया सूची से चुनीं।'
-              : 'स्थान का पता नहीं चल सका। कृपया नीचे से जिला चुनें।')
+          ? (L === 'en' || L === 'hin'
+              ? 'Location permission was denied. Please choose your district below.'
+              : 'स्थान की अनुमति नहीं मिली। कृपया नीचे से अपना जिला चुनें।')
+          : (L === 'en' || L === 'hin'
+              ? 'Could not detect your location. Please choose your district below.'
+              : 'स्थान का पता नहीं चल सका। कृपया नीचे से अपना जिला चुनें।')
       );
       setShowDistrictSelector(true);
     } finally {
@@ -185,959 +202,910 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const handleSelectDistrict = (districtName: string, stateName: string) => {
     const accuracyInfo = locationIntelligenceService.setManualDistrict(districtName, stateName);
     const newLoc = `${districtName}, ${stateName}`;
-    const updated: BeneficiaryProfile = {
+    onUpdateProfile?.({
       ...profile,
       location: newLoc,
       locationAccuracy: accuracyInfo.level,
       locationConfidence: accuracyInfo.confidenceScore,
       locationAccuracyMeters: undefined,
-      latitude: accuracyInfo.latitude,
-      longitude: accuracyInfo.longitude,
-    };
-    if (onUpdateProfile) {
-      onUpdateProfile(updated);
-    }
-    if (onLocationChange) {
-      onLocationChange(newLoc);
-    }
+    });
+    onLocationChange?.(newLoc);
     setShowDistrictSelector(false);
-    onNotify(
-      currentLang === 'bho'
-        ? `स्थान बदलल गइल: ${newLoc} (जिला स्तर · 88% विश्वास)`
-        : currentLang === 'en'
-        ? `Location set to: ${newLoc} (District-level · 88% confidence)`
-        : `स्थान सेट हुआ: ${newLoc} (जिला स्तर · 88% विश्वास)`
-    );
+    onNotify(`📍 ${newLoc}`);
   };
 
   const selectedPathway = rankedPaths.find((p) => p.id === selectedPathId) || topPaths[0] || rankedPaths[0];
   const completedCount = [0, 1, 2].filter((i) => doneStages[selectedPathway.id + i]).length;
   const filteredJobs = jobs.filter((j) => jobFilter === 'All' || j.type === jobFilter);
-  const totalShortlisted = Object.values(shortlist).filter(Boolean).length;
+  const nearbyCount = jobs.filter((j) => j.inRange).length;
+  const schemes = locationData?.schemes?.length ? locationData.schemes : FALLBACK_SCHEMES;
+  const schemesAreFallback = !locationData?.schemes?.length;
+  const centers = locationData?.trainingCenters || [];
 
-  const [celebratedStageKey, setCelebratedStageKey] = useState<string | null>(null);
-
-  const toggleWhy = (id: string) => {
-    setExpandedWhy((prev) => ({ ...prev, [id]: !prev[id] }));
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const toggleWhy = (id: string) => setExpandedWhy((prev) => ({ ...prev, [id]: !prev[id] }));
+
   const toggleStageDone = (key: string) => {
-    setDoneStages((prev) => {
-      const willBeDone = !prev[key];
-      const updated = { ...prev, [key]: willBeDone };
-      storageService.saveProgress(updated);
-
-      if (willBeDone) {
-        // Play success audio chime and trigger micro-interaction
-        speechService.playAudioCue('success');
-        setCelebratedStageKey(key);
-        onNotify('🎉 बधाई! आपने यह कौशल चरण पूरा कर लिया है! (Stage Completed!)');
-        setTimeout(() => setCelebratedStageKey(null), 2500);
-      }
-
-      return updated;
-    });
+    const willBeDone = !doneStages[key];
+    const updated = { ...doneStages, [key]: willBeDone };
+    setDoneStages(updated);
+    storageService.saveProgress(updated);
+    if (willBeDone) {
+      speechService.playAudioCue('success');
+      setCelebratedStageKey(key);
+      onNotify('🎉 ' + dt('stageDone', L));
+      setTimeout(() => setCelebratedStageKey(null), 2200);
+    }
   };
 
   const toggleShortlist = (id: string) => {
-    setShortlist((prev) => {
-      const updated = { ...prev, [id]: !prev[id] };
-      storageService.saveShortlist(updated);
-      onNotify(updated[id] ? 'Saved to personal shortlist.' : 'Removed from shortlist.');
-      return updated;
-    });
+    if (onShortlistToggle) {
+      onShortlistToggle(id);
+      return;
+    }
+    const updated = { ...localShortlist, [id]: !localShortlist[id] };
+    setLocalShortlist(updated);
+    storageService.saveShortlist(updated);
+    onNotify(updated[id] ? dt('savedToast', L) : dt('removedToast', L));
+  };
+
+  const stopAllSpeech = () => {
+    speechService.stopSpeaking();
+    setIsReadingRoadmap(false);
+    setReadingJobId(null);
   };
 
   const handleReadAloudRoadmap = () => {
     if (isReadingRoadmap) {
-      speechService.stopSpeaking();
-      setIsReadingRoadmap(false);
+      stopAllSpeech();
       return;
     }
-
-    let textToSpeak = '';
-    const loc = profile.location ? profile.location : (currentLang === 'bho' ? 'रउआ इलाका' : 'आपके क्षेत्र');
-
-    if (currentLang === 'bho') {
-      textToSpeak = `प्रणाम ${displayName}! जीविका एआई में रउआ स्वागत बा। रउआ पढ़ाई, हुनर अउर ${loc} के हिसाब से रउआ आजीविका रोडमैप बन गइल बा। ` +
-        (profile.aiAnalysis ? `एआई विश्लेषण: ${profile.aiAnalysis.summary}। ` : '') +
-        `रउआ खातिर सबसे उपयुक्त कौशल बा ${selectedPathway.name}। एह में रउआ मैच स्कोर बा ${selectedPathway.score} प्रतिशत। ई ट्रेनिंग ${selectedPathway.duration} के बा। ` +
-        `एकर तीन मुख्य चरण बा: ` +
-        `पहिला चरण: ${selectedPathway.stages[0][0]} - ${selectedPathway.stages[0][1]}। ` +
-        `दूसर चरण: ${selectedPathway.stages[1][0]} - ${selectedPathway.stages[1][1]}। ` +
-        `तीसर चरण: ${selectedPathway.stages[2][0]} - ${selectedPathway.stages[2][1]}। ` +
-        (filteredJobs.length > 0 ? `रउआ लगे ${filteredJobs.length} रोजगार के अवसर उपलब्ध बा, जइसे कि ${filteredJobs[0].title}। ` : '') +
-        `रउआ नीचे दिहल गइल चरण पूरा क के आपन प्रगति देख सकीं।`;
-    } else if (currentLang === 'en') {
-      textToSpeak = `Hello ${displayName}! Welcome to JeevikaAI. Based on your education and location in ${loc}, your personalized livelihood roadmap is ready. ` +
-        (profile.aiAnalysis ? `AI Analysis: ${profile.aiAnalysis.summary}. ` : '') +
-        `Your top recommended pathway is ${selectedPathway.name} with a fit score of ${selectedPathway.score} percent. Training duration is ${selectedPathway.duration}. ` +
-        `The three key stages are: ` +
-        `Stage 1: ${selectedPathway.stages[0][0]}, ${selectedPathway.stages[0][1]}. ` +
-        `Stage 2: ${selectedPathway.stages[1][0]}, ${selectedPathway.stages[1][1]}. ` +
-        `Stage 3: ${selectedPathway.stages[2][0]}, ${selectedPathway.stages[2][1]}. ` +
-        (filteredJobs.length > 0 ? `There are ${filteredJobs.length} opportunities available nearby, including ${filteredJobs[0].title}. ` : '') +
-        `You can complete the stages below to track your real-time progress.`;
+    stopAllSpeech();
+    const loc = locationLabel || (L === 'bho' ? 'रउआ इलाका' : 'आपके क्षेत्र');
+    const name = pathwayName(selectedPathway, L);
+    const st = [0, 1, 2].map((i) => stageText(selectedPathway, i, L));
+    const dur = localizeDuration(selectedPathway.duration, L);
+    const ai = profile.aiAnalysis?.summary ? profile.aiAnalysis.summary + (L === 'en' || L === 'hin' ? '. ' : '। ') : '';
+    const top = filteredJobs[0];
+    let text = '';
+    if (L === 'bho') {
+      text = `प्रणाम ${displayName}! रउआ पढ़ाई, हुनर अउर ${loc} के हिसाब से रोडमैप तइयार बा। ${ai}` +
+        `रउआ खातिर सबसे बढ़िया कौशल बा ${name}। मेल ${selectedPathway.score} प्रतिशत बा अउर ई ${dur} के बा। ` +
+        `पहिला चरण: ${st[0].title}। दूसर चरण: ${st[1].title}। तीसर चरण: ${st[2].title}। ` +
+        (top ? `रउआ लगे ${filteredJobs.length} मौका बा, जइसे ${top.title}। ` : '') +
+        'हर चरण पूरा होखे पर पूरा भइल दबाईं।';
+    } else if (L === 'en') {
+      text = `Hello ${displayName}! Your roadmap for ${loc} is ready. ${ai}` +
+        `Your best skill match is ${name} with a fit score of ${selectedPathway.score} percent. It takes ${dur}. ` +
+        `Stage 1: ${st[0].title}. Stage 2: ${st[1].title}. Stage 3: ${st[2].title}. ` +
+        (top ? `There are ${filteredJobs.length} openings for you, including ${top.title}. ` : '') +
+        'Tap mark done as you finish each stage.';
+    } else if (L === 'hin') {
+      text = `Namaste ${displayName}! ${loc} ke liye aapka roadmap taiyaar hai. ${ai}` +
+        `Aapke liye sabse accha skill hai ${name}, match ${selectedPathway.score} percent. Training ${dur} ki hai. ` +
+        `Stage 1: ${st[0].title}. Stage 2: ${st[1].title}. Stage 3: ${st[2].title}. ` +
+        (top ? `Aapke liye ${filteredJobs.length} openings hain, jaise ${top.title}. ` : '') +
+        'Har stage ke baad mark done dabayein.';
     } else {
-      textToSpeak = `नमस्ते ${displayName}! जीविका एआई में आपका स्वागत है। आपकी शिक्षा, हुनर और ${loc} के अनुसार आपका व्यक्तिगत आजीविका रोडमैप तैयार है। ` +
-        (profile.aiAnalysis ? `एआई विश्लेषण: ${profile.aiAnalysis.summary}। ` : '') +
-        `आपके लिए सबसे उपयुक्त कौशल है ${selectedPathway.name}। आपकी योग्यता मैच स्कोर ${selectedPathway.score} प्रतिशत है और यह प्रशिक्षण ${selectedPathway.duration} का है। ` +
-        `इसके तीन मुख्य चरण हैं: ` +
-        `पहला चरण: ${selectedPathway.stages[0][0]} - ${selectedPathway.stages[0][1]}। ` +
-        `दूसरा चरण: ${selectedPathway.stages[1][0]} - ${selectedPathway.stages[1][1]}। ` +
-        `तीसरा चरण: ${selectedPathway.stages[2][0]} - ${selectedPathway.stages[2][1]}। ` +
-        (filteredJobs.length > 0 ? `आपके लिए पास में ${filteredJobs.length} रोजगार और स्वरोजगार के अवसर उपलब्ध हैं, जैसे ${filteredJobs[0].title}। ` : '') +
-        `आप नीचे दिए गए चरणों को पूरा करके अपनी प्रगति दर्ज कर सकते हैं। धन्यवाद!`;
+      text = `नमस्ते ${displayName}! ${loc} के अनुसार आपका रोडमैप तैयार है। ${ai}` +
+        `आपके लिए सबसे अच्छा कौशल है ${name}। मेल ${selectedPathway.score} प्रतिशत है और प्रशिक्षण ${dur} का है। ` +
+        `पहला चरण: ${st[0].title}। दूसरा चरण: ${st[1].title}। तीसरा चरण: ${st[2].title}। ` +
+        (top ? `आपके लिए ${filteredJobs.length} अवसर हैं, जैसे ${top.title}। ` : '') +
+        'हर चरण पूरा होने पर पूरा हुआ दबाएँ।';
     }
-
     setIsReadingRoadmap(true);
-    speechService.speak(textToSpeak, currentLang, () => {
-      setIsReadingRoadmap(false);
-    });
+    speechService.speak(text, L, () => setIsReadingRoadmap(false));
+  };
+
+  const handleReadJob = (job: Opportunity) => {
+    if (readingJobId === job.id) {
+      stopAllSpeech();
+      return;
+    }
+    stopAllSpeech();
+    const t = opportunityTypeLabel(job.type, L);
+    const dist = distanceLabel(job.km, L);
+    let text = '';
+    if (isEnglishLike(L)) {
+      text = `${job.title}. ${job.org}. ${t}. ${job.loc}, ${dist}. Pay: ${job.pay}.`;
+    } else {
+      text = `${job.title}। ${job.org}। ${t}। ${job.loc}, ${dist}। कमाई: ${job.pay}।`;
+    }
+    setReadingJobId(job.id);
+    speechService.speak(text, L, () => setReadingJobId(null));
   };
 
   const handleDownload = () => {
     const text = buildSummary(profile, rankedPaths, jobs, selectedPathId, shortlist);
-    const fname = `JeevikaAI-Roadmap-${slug(displayName)}.txt`;
     onOpenSummary({
       text,
-      fname,
+      fname: `JeevikaAI-Roadmap-${slug(displayName)}.txt`,
       profile,
       selectedPathway,
       jobs: filteredJobs,
     });
   };
 
-  const scrollToSection = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const navItems = [
+    { id: 'overview-section', icon: 'compass', label: dt('navOverview', L) },
+    { id: 'hub-section', icon: 'pin', label: dt('navHub', L) },
+    { id: 'schemes-section', icon: 'shieldCheck', label: dt('navSchemes', L) },
+    { id: 'pathways-section', icon: 'layers', label: dt('navPathways', L) },
+    { id: 'roadmap-section', icon: 'route', label: dt('navRoadmap', L) },
+    { id: 'opportunities-section', icon: 'briefcase', label: dt('navOpenings', L) },
+    { id: 'centers-section', icon: 'cap', label: dt('navCenters', L) },
+  ];
+
+  const coverageText =
+    currentAccuracy.level === 'Precise'
+      ? dt('covPrecise', L, { m: currentAccuracy.accuracyMeters ? ` (±${currentAccuracy.accuracyMeters}m)` : '' })
+      : currentAccuracy.level === 'District-level'
+      ? dt('covDistrict', L, { loc: locationLabel || districtShort || '—' })
+      : dt('covState', L);
+
+  const eduText = optionLabel(EDU, profile.education, L) || dt('notShared', L);
+  const workText = optionLabel(WORK, profile.workType, L) || dt('notShared', L);
+  const mobText = optionLabel(MOB, profile.mobility, L) || dt('notShared', L);
+
+  const kpiLabelClass = 'text-[11px] font-bold uppercase tracking-wider';
 
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      {/* Top Welcome Hero Banner with Integrated Profile Summary */}
-      <div className="bg-gradient-to-br from-[#17365D] via-[#1E4373] to-[#245A91] rounded-3xl p-6 sm:p-8 text-white shadow-lg mb-8 relative overflow-hidden">
-        <div className="absolute -right-10 -bottom-10 w-56 h-56 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-        
-        <div className="relative z-10 space-y-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="flex items-start gap-4">
-              {/* User Avatar Circle */}
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 text-white flex items-center justify-center font-extrabold text-2xl font-['Bricolage_Grotesque'] flex-shrink-0 shadow-md">
-                {displayInitial}
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full text-xs font-bold bg-white/15 text-white backdrop-blur-md border border-white/20">
-                  <span className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
-                  <span>व्यक्तिगत आजीविका योजना (Personalized Roadmap)</span>
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-['Bricolage_Grotesque']">
-                  नमस्ते, {displayName}! 👋
-                </h1>
-                <p className="text-xs sm:text-sm text-white/85 max-w-xl leading-relaxed font-['Hind']">
-                  आपकी शिक्षा, रुचि और स्थान के आधार पर तैयार की गई आजीविका योजना।
-                </p>
-
-                {profile.aiAnalysis && (
-                  <div className="mt-2.5 p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-xs text-white/95 flex items-start gap-2 max-w-xl">
-                    <Icon name="sparkles" size={16} className="text-[#38BDF8] flex-shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-extrabold text-[#38BDF8] mr-1">AI विश्लेषण:</span>
-                      <span>{profile.aiAnalysis.summary}</span>
-                      {profile.aiAnalysis.topCareerPathway && (
-                        <div className="mt-1 flex items-center gap-2">
-                          <span className="inline-block px-2 py-0.5 rounded-md bg-white/20 font-bold text-[10px] text-white">
-                            🎯 अनुशंसित क्षेत्र: {profile.aiAnalysis.topCareerPathway}
-                          </span>
-                          {profile.aiAnalysis.readinessScore && (
-                            <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-500/30 text-emerald-200 font-bold text-[10px]">
-                              ⚡ तैयारी स्कोर: {profile.aiAnalysis.readinessScore}%
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Hero Actions */}
-            <div className="flex flex-wrap lg:flex-col items-stretch gap-2.5 flex-shrink-0">
-              <button
-                onClick={handleReadAloudRoadmap}
-                className={`px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md ${
-                  isReadingRoadmap
-                    ? 'bg-[#38BDF8] text-[#17365D]'
-                    : 'bg-white text-[#17365D] hover:bg-slate-100'
-                }`}
-              >
-                <Icon name={isReadingRoadmap ? 'volumeX' : 'volume2'} size={18} />
-                <span>{isReadingRoadmap ? 'रोकें (Stop)' : 'रोडमैप सुनें (Audio)'}</span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => go('profile')}
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Icon name="edit" size={14} />
-                  <span>Edit Profile</span>
-                </button>
-                <button
-                  onClick={handleDownload}
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <Icon name="download" size={14} />
-                  <span>Export</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Profile Attribute Chips Bar */}
-          <div className="pt-4 border-t border-white/15 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
-                <Icon name="cap" size={14} className="text-[#38BDF8]" />
-                <span>शिक्षा: {profile.education || '10वीं पास'}</span>
-              </span>
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
-                <Icon name="pin" size={14} className="text-[#38BDF8]" />
-                <span>स्थान: {profile.location || 'उत्तर प्रदेश'}</span>
-                <span className="ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#38BDF8]/25 text-[#7DD3FC] border border-[#38BDF8]/30">
-                  {currentAccuracy.level === 'Precise' ? '🎯 GPS' : currentAccuracy.level === 'District-level' ? '🏛️ जिला' : '📍 क्षेत्र'} · {currentAccuracy.confidenceScore}% विश्वास
-                </span>
-              </span>
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
-                <Icon name="store" size={14} className="text-[#38BDF8]" />
-                <span>काम की प्राथमिकता: {profile.workType || 'Self-employment'}</span>
-              </span>
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 font-medium">
-                <Icon name="sparkles" size={14} className="text-[#FBBF24]" />
-                <span>Top Match: {topPaths[0]?.name} ({topPaths[0]?.score}%)</span>
-              </span>
-            </div>
-
-            <button
-              onClick={() => setShowProfileDetails(!showProfileDetails)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-white/90 hover:text-white underline underline-offset-4"
-            >
-              <span>{showProfileDetails ? 'प्रोफ़ाइल विवरण छिपाएँ' : 'सभी प्रोफ़ाइल विवरण देखें'}</span>
-              <Icon name="chev" size={14} className={`transition-transform duration-200 ${showProfileDetails ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-
-          {/* Expandable Profile Overview Card */}
-          {showProfileDetails && (
-            <div className="mt-4 p-5 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">
-                  वर्तमान कौशल (Skills)
-                </div>
-                <div className="font-semibold text-white mt-1">
-                  {profile.skills || 'सिलाई, प्राथमिक डिजिटल काम'}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">
-                  रुचि व महत्वाकांक्षा (Interests)
-                </div>
-                <div className="font-semibold text-white mt-1">
-                  {profile.interests || 'डिजिटल सेवाएँ, स्वरोजगार'}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">
-                  वर्तमान कार्य (Occupation)
-                </div>
-                <div className="font-semibold text-white mt-1">
-                  {profile.occupation || 'गृहकार्य व हस्तशिल्प'}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">
-                  यात्रा सीमा (Mobility)
-                </div>
-                <div className="font-semibold text-white mt-1">
-                  {profile.mobility || 'Nearby only (within ~10 km)'}
-                </div>
-              </div>
-            </div>
-          )}
+    <main className="bg-[#F5F7FA] min-h-screen">
+      {/* Breadcrumb strip, like a government portal */}
+      <div className="bg-white border-b border-[#DCE3EA]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-[#5F6B76]">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 font-medium">
+            <button onClick={() => go('home')} className="hover:text-[#17365D] hover:underline">{dt('crumbHome', L)}</button>
+            <span aria-hidden>›</span>
+            <span className="text-[#17365D] font-bold">{dt('crumbDash', L)}</span>
+          </nav>
+          <span className="inline-flex items-center gap-1.5 font-semibold text-[#17365D]">
+            <Icon name="shieldCheck" size={14} className="text-[#287D73]" />
+            {dt('portalLabel', L)}
+          </span>
         </div>
       </div>
 
-      {/* Highlights Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="p-5 rounded-2xl bg-white border border-[#DCE3EA] shadow-xs flex items-center gap-4">
-          <Ring value={topPaths[0]?.score || 85} size={56} />
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#287D73]">
-              सर्वश्रेष्ठ करियर मैच (Top Match)
-            </div>
-            <div className="text-base font-bold text-[#17365D]">
-              {topPaths[0]?.name}
-            </div>
-            <div className="text-xs text-[#5F6B76]">
-              NSQF Level {topPaths[0]?.nsqf} · {topPaths[0]?.duration}
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border border-[#DCE3EA] shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#287D73]/15 text-[#287D73] flex items-center justify-center font-bold">
-            <Icon name="route" size={24} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#287D73]">
-              रोडमैप प्रगति (Progress)
-            </div>
-            <div className="text-base font-bold text-[#17365D]">
-              {completedCount} of 3 Stages Done
-            </div>
-            <div className="w-full bg-[#F5F7FA] h-2 rounded-full overflow-hidden mt-1.5 border border-[#DCE3EA]">
-              <div
-                className="bg-[#287D73] h-full rounded-full transition-all duration-300"
-                style={{ width: `${(completedCount / 3) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border border-[#DCE3EA] shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#245A91]/15 text-[#245A91] flex items-center justify-center font-bold">
-            <Icon name="briefcase" size={24} />
-          </div>
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#245A91]">
-              पास के अवसर (Nearby Jobs)
-            </div>
-            <div className="text-base font-bold text-[#17365D]">
-              {filteredJobs.length} Available Listings
-            </div>
-            <div className="text-xs text-[#5F6B76]">
-              {profile.mobility || 'Nearby'} Range
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Hyperlocal Location Intelligence & Local Economy Card */}
-      <section className="bg-gradient-to-br from-emerald-50/80 via-teal-50/60 to-sky-50/70 border border-emerald-200/90 rounded-3xl p-6 sm:p-7 shadow-xs mb-8">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-5">
-          <div className="space-y-2 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#17365D] text-white shadow-xs">
-                <Icon name="pin" size={13} className="text-[#38BDF8]" />
-                <span>जिला आजीविका एवं आर्थिक केंद्र · District Livelihood Hub</span>
-              </span>
-
-              {locationData?.isAiGenerated ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
-                  <Icon name="sparkles" size={12} className="text-blue-600" />
-                  <span>Gemini AI Live Synced</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  <Icon name="check" size={12} className="text-emerald-700" />
-                  <span>Verified Curated Data</span>
-                </span>
-              )}
-              {locationData?.timestamp && (
-                <span className="text-[11px] text-[#5F6B76] font-medium hidden sm:inline">
-                  अपडेट: {new Date(locationData.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-            </div>
-
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#17365D] tracking-tight font-['Bricolage_Grotesque']">
-              📍 {profile.location || locationData?.district || 'उत्तर प्रदेश'}
-            </h2>
-
-            <p className="text-xs sm:text-sm text-[#5F6B76] max-w-3xl leading-relaxed">
-              {locationData?.insight?.economicHub ||
-                'स्थानीय औद्योगिक केंद्र, सौर ऊर्जा, डिजिटल कॉमन सर्विस सेंटर एवं ग्रामीण हस्तशिल्प में स्वरोजगार के अवसर।'}
-            </p>
-          </div>
-
-          {/* Action Buttons: Detect My Location (GPS), Change District, AI Live Refresh */}
-          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-            <button
-              id="detect-my-location-card-btn"
-              onClick={handleDetectLocation}
-              disabled={isDetectingLocation}
-              className="px-4 py-2.5 rounded-2xl bg-[#287D73] hover:bg-[#1E6058] text-white text-xs font-extrabold transition-all shadow-md flex items-center gap-2 active:scale-95 disabled:opacity-75 cursor-pointer"
-              title="Detect current location using GPS Geolocation API"
-            >
-              <Icon
-                name={isDetectingLocation ? 'refresh' : 'target'}
-                size={15}
-                className={isDetectingLocation ? 'animate-spin text-white' : 'text-white'}
-              />
-              <span>
-                {isDetectingLocation
-                  ? (currentLang === 'bho' ? 'जीपीएस खोज रहल बा...' : currentLang === 'en' ? 'Detecting GPS...' : 'जीपीएस खोज रहे हैं...')
-                  : (currentLang === 'bho' ? '📍 जीपीएस से पहचानल जाव' : currentLang === 'en' ? '📍 Detect GPS Location' : '📍 जीपीएस से पहचानें (GPS Detect)')}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setShowDistrictSelector(!showDistrictSelector)}
-              className="px-3.5 py-2.5 rounded-2xl bg-white border border-[#DCE3EA] text-[#17365D] hover:bg-slate-50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <Icon name="chev" size={14} className={showDistrictSelector ? 'rotate-180' : ''} />
-              <span>{showDistrictSelector ? 'बंद करें (Close)' : '🏛️ जिला बदलें (Change District)'}</span>
-            </button>
-
-            {onRefreshLocationAi && (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 lg:grid lg:grid-cols-[230px_1fr] lg:gap-8">
+        {/* Section navigation: sidebar on laptops, scrollable chips on phone and tablet */}
+        <aside className="lg:sticky lg:top-24 lg:self-start mb-5 lg:mb-0">
+          <nav
+            aria-label={dt('menu', L)}
+            className="hidden lg:block bg-white border border-[#DCE3EA] rounded-2xl p-2 shadow-xs"
+          >
+            <div className="px-3 pt-2 pb-1 text-[11px] font-extrabold uppercase tracking-widest text-[#5F6B76]">{dt('menu', L)}</div>
+            {navItems.map((n) => (
               <button
-                onClick={onRefreshLocationAi}
-                disabled={isRefreshingLocationData}
-                className="px-3.5 py-2.5 rounded-2xl bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-70 cursor-pointer"
-                title="Fetch live location data via Gemini AI"
+                key={n.id}
+                onClick={() => scrollToSection(n.id)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-[#17365D] hover:bg-[#F5F7FA] text-left"
               >
-                <Icon
-                  name="sparkles"
-                  size={14}
-                  className={isRefreshingLocationData ? 'animate-spin text-blue-600' : 'text-blue-600'}
-                />
-                <span>{isRefreshingLocationData ? 'लोड हो रहा है...' : '✨ Live AI Refresh'}</span>
+                <Icon name={n.icon} size={18} className="text-[#245A91]" />
+                <span>{n.label}</span>
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* Expandable District Selector Dropdown Modal */}
-        {showDistrictSelector && (
-          <div className="mt-5 p-5 rounded-2xl bg-white border border-[#DCE3EA] shadow-lg animate-fade-in space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-[#DCE3EA]">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[#245A91]">
-                भारतीय राज्य व जिले चुनें (Select State &amp; District)
-              </span>
-              <span className="text-xs text-[#5F6B76]">
-                GPS अनुमति न मिलने पर सीधे जिले पर क्लिक करें
-              </span>
-            </div>
-
-            {/* State Tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-              {POPULAR_INDIAN_REGIONS.map((region, idx) => (
+            ))}
+          </nav>
+          <nav aria-label={dt('menu', L)} className="lg:hidden -mx-4 px-4 overflow-x-auto">
+            <div className="flex gap-2 pb-1 w-max">
+              {navItems.map((n) => (
                 <button
-                  key={region.state}
-                  onClick={() => setSelectedStateIndex(idx)}
-                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-colors ${
-                    selectedStateIndex === idx
-                      ? 'bg-[#17365D] text-white'
-                      : 'bg-[#F5F7FA] text-[#5F6B76] hover:bg-[#E9ECEF]'
-                  }`}
+                  key={n.id}
+                  onClick={() => scrollToSection(n.id)}
+                  className="inline-flex items-center gap-1.5 min-h-11 px-3.5 rounded-full bg-white border border-[#DCE3EA] text-xs font-bold text-[#17365D] whitespace-nowrap"
                 >
-                  {region.stateHi} ({region.state})
+                  <Icon name={n.icon} size={14} className="text-[#245A91]" />
+                  {n.label}
                 </button>
               ))}
             </div>
+          </nav>
+        </aside>
 
-            {/* Districts Grid for selected state */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {POPULAR_INDIAN_REGIONS[selectedStateIndex]?.districts.map((dist) => {
-                const isCurrent = (profile.location || '').toLowerCase().includes(dist.name.toLowerCase());
-                return (
+        <div className="space-y-5 sm:space-y-6 min-w-0">
+          {/* Welcome banner */}
+          <section id="overview-section" className="scroll-mt-28 rounded-2xl overflow-hidden shadow-md bg-gradient-to-br from-[#17365D] via-[#1E4373] to-[#245A91] text-white">
+            <div className="gov-tricolor-line" />
+            <div className="p-5 sm:p-7 space-y-5">
+              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center font-extrabold text-2xl flex-none">
+                    {displayInitial}
+                  </div>
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full text-xs font-bold bg-white/15 border border-white/20">
+                      <span className="w-2 h-2 rounded-full bg-[#38BDF8]" />
+                      {dt('planTag', L)}
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight !text-white break-words">
+                      {dt('hello', L)}, {displayName}! 👋
+                    </h1>
+                    <p className="text-sm text-white/90 max-w-xl leading-relaxed">{dt('planSub', L)}</p>
+                    {!hasAssessment && (
+                      <p className="mt-2 text-xs sm:text-sm font-semibold bg-[#D9822B] text-white rounded-xl px-3 py-2 max-w-xl">
+                        {dt('demoNote', L)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-1 gap-2.5 lg:w-56 flex-none">
                   <button
-                    key={dist.name}
-                    onClick={() => handleSelectDistrict(dist.name, POPULAR_INDIAN_REGIONS[selectedStateIndex].state)}
-                    className={`p-2.5 rounded-xl text-left border text-xs font-bold transition-all ${
-                      isCurrent
-                        ? 'border-[#287D73] bg-[#287D73]/10 text-[#287D73]'
-                        : 'border-[#DCE3EA] bg-white hover:border-[#245A91] hover:bg-[#F5F7FA] text-[#17365D]'
+                    onClick={handleReadAloudRoadmap}
+                    aria-pressed={isReadingRoadmap}
+                    className={`col-span-2 lg:col-span-1 min-h-12 px-4 rounded-xl text-sm font-extrabold flex items-center justify-center gap-2 shadow-md ${
+                      isReadingRoadmap ? 'bg-[#38BDF8] text-[#17365D]' : 'bg-white text-[#17365D] hover:bg-slate-100'
                     }`}
                   >
-                    <div>{dist.hi}</div>
-                    <div className="text-[10px] text-[#5F6B76] font-medium">{dist.name}</div>
+                    <Icon name={isReadingRoadmap ? 'volumeX' : 'volume2'} size={20} />
+                    {isReadingRoadmap ? dt('stopListen', L) : dt('listenRoadmap', L)}
                   </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                  <button
+                    onClick={() => go('profile')}
+                    className="min-h-11 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/25 flex items-center justify-center gap-1.5"
+                  >
+                    <Icon name="edit" size={14} />
+                    {dt('editProfile', L)}
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    className="min-h-11 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/25 flex items-center justify-center gap-1.5"
+                  >
+                    <Icon name="download" size={14} />
+                    {dt('exportBtn', L)}
+                  </button>
+                </div>
+              </div>
 
-        {/* Precision & District Coverage Status Strip */}
-        <div className="mt-4 p-3.5 rounded-2xl bg-white/75 border border-emerald-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <span className="p-1.5 rounded-xl bg-[#287D73]/15 text-[#287D73]">
-              <Icon name="target" size={16} />
-            </span>
-            <div>
-              <span className="font-bold text-[#17365D]">
-                स्थानीय कवरेज व सटीकता:{' '}
+              {profile.aiAnalysis?.summary && (
+                <div className="p-3.5 rounded-xl bg-white/10 border border-white/20 text-sm flex items-start gap-2.5">
+                  <Icon name="sparkles" size={18} className="text-[#38BDF8] flex-none mt-0.5" />
+                  <div className="min-w-0">
+                    <span className="font-extrabold text-[#7DD3FC] mr-1">{dt('aiSummary', L)}:</span>
+                    <span>{profile.aiAnalysis.summary}</span>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {profile.aiAnalysis.topCareerPathway && (
+                        <span className="px-2 py-0.5 rounded-md bg-white/20 font-bold text-xs">
+                          🎯 {dt('aiField', L)}: {profile.aiAnalysis.topCareerPathway}
+                        </span>
+                      )}
+                      {profile.aiAnalysis.readinessScore ? (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/30 text-emerald-100 font-bold text-xs">
+                          ⚡ {dt('aiReady', L)}: {profile.aiAnalysis.readinessScore}%
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-white/15 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/15 font-semibold">
+                    <Icon name="cap" size={14} className="text-[#38BDF8]" />
+                    {dt('chipEdu', L)}: {eduText}
+                  </span>
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/15 font-semibold">
+                    <Icon name="pin" size={14} className="text-[#38BDF8]" />
+                    {dt('chipLoc', L)}: {locationLabel || '—'}
+                  </span>
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/15 font-semibold">
+                    <Icon name="store" size={14} className="text-[#38BDF8]" />
+                    {dt('chipWork', L)}: {workText}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowProfileDetails(!showProfileDetails)}
+                  aria-expanded={showProfileDetails}
+                  className="min-h-9 inline-flex items-center gap-1.5 text-xs font-bold text-white/95 hover:text-white underline underline-offset-4"
+                >
+                  {showProfileDetails ? dt('hideDetails', L) : dt('showDetails', L)}
+                  <Icon name="chev" size={14} className={showProfileDetails ? 'rotate-180' : ''} />
+                </button>
+              </div>
+
+              {showProfileDetails && (
+                <div className="p-4 rounded-xl bg-white/10 border border-white/20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                  {[
+                    [dt('dSkills', L), profile.skills],
+                    [dt('dInterests', L), profile.interests],
+                    [dt('dOccupation', L), profile.occupation],
+                    [dt('dMobility', L), mobText],
+                  ].map(([k, v]) => (
+                    <div key={k as string} className="min-w-0">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-white/70">{k}</div>
+                      <div className="font-semibold mt-0.5 break-words">{v || dt('notShared', L)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Assisted account: JeevikaAI creates the account for people who cannot do it themselves */}
+          {hasAssessment && onOpenAccount && (!currentUser || currentUser.isAnonymous) && (
+            <section
+              id="account-banner"
+              className="rounded-2xl border-2 border-[#287D73]/40 bg-[#287D73]/5 p-4 sm:p-5 flex flex-col md:flex-row md:items-center gap-4"
+            >
+              <span className="w-12 h-12 rounded-xl bg-[#287D73] text-white flex items-center justify-center flex-none">
+                <Icon name="user" size={24} />
               </span>
-              <span className="text-[#5F6B76]">
-                {currentAccuracy.level === 'Precise'
-                  ? `उच्च सटीकता GPS फिक्स (${currentAccuracy.accuracyMeters ? `±${currentAccuracy.accuracyMeters}m` : '100m के भीतर'}) · 5–15 किमी के रोजगार व केंद्र सक्रिय हैं`
-                  : currentAccuracy.level === 'District-level'
-                  ? `जिला प्रशासनिक दायरा (${profile.location || locationData?.district || 'स्थानीय'}) · संपूर्ण जिले के RSETI, PMKK, ITI व रोजगार सक्रिय हैं`
-                  : 'राज्य स्तरीय कवरेज'}
-              </span>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base sm:text-lg font-extrabold text-[#17365D]">{dt('accTitle', L)}</h2>
+                <p className="text-sm text-[#5F6B76] mt-0.5">{dt('accBody', L)}</p>
+              </div>
+              <div className="flex flex-col sm:flex-row md:flex-col gap-2 md:w-60 flex-none">
+                <button
+                  onClick={() => onOpenAccount('create')}
+                  className="min-h-12 px-4 rounded-xl bg-[#287D73] hover:bg-[#1E6058] text-white text-sm font-extrabold flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <Icon name="mic" size={18} />
+                  {dt('accCreate', L)}
+                </button>
+                <button
+                  onClick={() => onOpenAccount('login')}
+                  className="min-h-11 px-4 rounded-xl border border-[#C5D1DD] bg-white text-[#17365D] text-sm font-bold"
+                >
+                  {dt('accLogin', L)}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* KPI row */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+            <div className="col-span-2 xl:col-span-1 p-4 rounded-2xl bg-white border border-[#DCE3EA] shadow-xs flex items-center gap-3">
+              <Ring value={topPaths[0]?.score || 0} size={56} label={dt('kpiTop', L)} />
+              <div className="min-w-0">
+                <div className={`${kpiLabelClass} text-[#287D73]`}>{dt('kpiTop', L)}</div>
+                <div className="text-base font-extrabold text-[#17365D] leading-tight">{topPaths[0] && pathwayName(topPaths[0], L)}</div>
+                <div className="text-xs text-[#5F6B76]">
+                  {dt('nsqfLevel', L)} {topPaths[0]?.nsqf} · {topPaths[0] && localizeDuration(topPaths[0].duration, L).split('(')[0].split('(')[0].trim()}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 rounded-2xl bg-white border border-[#DCE3EA] shadow-xs">
+              <div className={`${kpiLabelClass} text-[#287D73]`}>{dt('kpiProgress', L)}</div>
+              <div className="text-base font-extrabold text-[#17365D] mt-1">{dt('stagesOf', L, { n: completedCount })}</div>
+              <div className="w-full bg-[#F5F7FA] h-2 rounded-full overflow-hidden mt-2 border border-[#DCE3EA]">
+                <div className="bg-[#287D73] h-full rounded-full transition-all" style={{ width: `${(completedCount / 3) * 100}%` }} />
+              </div>
+            </div>
+            <div className="p-4 rounded-2xl bg-white border border-[#DCE3EA] shadow-xs">
+              <div className={`${kpiLabelClass} text-[#245A91]`}>{dt('kpiOpenings', L)}</div>
+              <div className="text-2xl font-extrabold text-[#17365D] mt-0.5">{jobs.length}</div>
+              <div className="text-xs text-[#5F6B76]">{dt('nearbyOf', L, { a: nearbyCount, b: jobs.length })}</div>
+            </div>
+            <div className="p-4 rounded-2xl bg-white border border-[#DCE3EA] shadow-xs">
+              <div className={`${kpiLabelClass} text-[#D9822B]`}>{dt('kpiSchemes', L)}</div>
+              <div className="text-2xl font-extrabold text-[#17365D] mt-0.5">{schemes.length}</div>
+              <div className="text-xs text-[#5F6B76]">{districtShort ? `${dt('inDistrict', L)}: ${districtShort}` : dt('inDistrict', L)}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-[#17365D] text-white">
-              {currentAccuracy.confidenceScore}% डेटा विश्वास
-            </span>
-            {currentAccuracy.locality && (
-              <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                📍 {currentAccuracy.locality}
-              </span>
+
+          {/* District hub */}
+          <Panel id="hub-section">
+            <SectionHead
+              icon="pin"
+              tag={dt('hubTitle', L)}
+              title={locationLabel || '—'}
+              right={
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${
+                      locationData?.isAiGenerated
+                        ? 'bg-blue-50 text-blue-800 border-blue-200'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    }`}
+                  >
+                    <Icon name={locationData?.isAiGenerated ? 'sparkles' : 'check'} size={12} />
+                    {locationData?.isAiGenerated ? dt('liveAi', L) : dt('curated', L)}
+                  </span>
+                  {locationData?.timestamp && (
+                    <span className="text-[11px] text-[#5F6B76] font-medium">
+                      {dt('updated', L)}: {new Date(locationData.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+              }
+            />
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                id="detect-my-location-card-btn"
+                onClick={handleDetectLocation}
+                disabled={isDetectingLocation}
+                className="min-h-12 px-4 rounded-xl bg-[#287D73] hover:bg-[#1E6058] text-white text-sm font-extrabold flex items-center gap-2 shadow-sm active:scale-95 disabled:opacity-75"
+              >
+                <Icon name={isDetectingLocation ? 'refresh' : 'target'} size={18} className={isDetectingLocation ? 'animate-spin' : ''} />
+                {isDetectingLocation ? dt('detecting', L) : dt('detectGps', L)}
+              </button>
+              <button
+                onClick={() => setShowDistrictSelector(!showDistrictSelector)}
+                aria-expanded={showDistrictSelector}
+                className="min-h-12 px-4 rounded-xl bg-white border border-[#C5D1DD] text-[#17365D] hover:bg-[#F5F7FA] text-sm font-bold flex items-center gap-2"
+              >
+                <Icon name="chev" size={16} className={showDistrictSelector ? 'rotate-180' : ''} />
+                {showDistrictSelector ? dt('closeBtn', L) : dt('changeDistrict', L)}
+              </button>
+              {onRefreshLocationAi && (
+                <button
+                  onClick={onRefreshLocationAi}
+                  disabled={isRefreshingLocationData}
+                  className="min-h-12 px-4 rounded-xl bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 text-sm font-bold flex items-center gap-2 disabled:opacity-70"
+                >
+                  <Icon name="sparkles" size={16} className={isRefreshingLocationData ? 'animate-spin' : ''} />
+                  {isRefreshingLocationData ? dt('refreshing', L) : dt('refreshAi', L)}
+                </button>
+              )}
+            </div>
+
+            {showDistrictSelector && (
+              <div className="mt-4 p-4 rounded-xl bg-[#F5F7FA] border border-[#DCE3EA] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#245A91]">{dt('selectDistrict', L)}</span>
+                  <span className="text-xs text-[#5F6B76]">{dt('gpsHint', L)}</span>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {POPULAR_INDIAN_REGIONS.map((region, idx) => (
+                    <button
+                      key={region.state}
+                      onClick={() => setSelectedStateIndex(idx)}
+                      className={`min-h-10 px-3 rounded-lg text-xs font-bold whitespace-nowrap ${
+                        selectedStateIndex === idx ? 'bg-[#17365D] text-white' : 'bg-white border border-[#DCE3EA] text-[#5F6B76] hover:bg-[#E9ECEF]'
+                      }`}
+                    >
+                      {isEnglishLike(L) ? region.state : region.stateHi}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2">
+                  {POPULAR_INDIAN_REGIONS[selectedStateIndex]?.districts.map((dist) => {
+                    const isCurrent = locationLabel.toLowerCase().includes(dist.name.toLowerCase());
+                    return (
+                      <button
+                        key={dist.name}
+                        onClick={() => handleSelectDistrict(dist.name, POPULAR_INDIAN_REGIONS[selectedStateIndex].state)}
+                        className={`min-h-12 p-2.5 rounded-lg text-left border text-sm font-bold ${
+                          isCurrent
+                            ? 'border-[#287D73] bg-[#287D73]/10 text-[#287D73]'
+                            : 'border-[#DCE3EA] bg-white hover:border-[#245A91] text-[#17365D]'
+                        }`}
+                      >
+                        <div>{isEnglishLike(L) ? dist.name : dist.hi}</div>
+                        <div className="text-[11px] text-[#5F6B76] font-medium">{isEnglishLike(L) ? dist.hi : dist.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
-          </div>
-        </div>
 
-        {/* Interactive District Area Mini-Map Visualization */}
-        <div className="mt-4">
-          <DistrictMiniMap
-            latitude={currentAccuracy.latitude || locationData?.latitude}
-            longitude={currentAccuracy.longitude || locationData?.longitude}
-            district={locationData?.district || profile.location}
-            state={locationData?.state}
-            locality={currentAccuracy.locality}
-            accuracyLevel={currentAccuracy.level}
-            accuracyMeters={currentAccuracy.accuracyMeters}
-            confidenceScore={currentAccuracy.confidenceScore}
-            trainingCenters={locationData?.trainingCenters}
-            opportunities={locationData?.opportunities}
-            onReDetect={handleDetectLocation}
-            isDetecting={isDetectingLocation}
-          />
-        </div>
-
-        {/* District Intelligence Metrics & Fast Shortcuts */}
-        <div className="mt-5 pt-4 border-t border-emerald-200/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-100 shadow-xs">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#287D73]">
-              प्रमुख आर्थिक क्षेत्र (Top Sectors)
-            </div>
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {(locationData?.insight?.topSectors || ['कृषि उपकरण', 'सौर ऊर्जा', 'सिलाई-कढ़ाई', 'डिजिटल सेवा']).map((sec, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-semibold text-[11px] border border-emerald-200">
-                  {sec}
+            <div className="mt-4 p-3.5 rounded-xl bg-[#F5F7FA] border border-[#DCE3EA] flex flex-wrap items-start justify-between gap-3 text-sm">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="p-1.5 rounded-lg bg-[#287D73]/15 text-[#287D73] flex-none">
+                  <Icon name="target" size={16} />
                 </span>
+                <div className="min-w-0">
+                  <span className="font-bold text-[#17365D]">{dt('coverage', L)}: </span>
+                  <span className="text-[#5F6B76]">{coverageText}</span>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-[#17365D] text-white flex-none">
+                {dt('confidence', L, { n: currentAccuracy.confidenceScore })}
+              </span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 rounded-xl border border-[#DCE3EA]">
+                <div className={`${kpiLabelClass} text-[#287D73]`}>{dt('topSectors', L)}</div>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {(locationData?.insight?.topSectors?.length ? locationData.insight.topSectors : []).map((s, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-semibold text-xs border border-emerald-200">
+                      {s}
+                    </span>
+                  ))}
+                  {!locationData?.insight?.topSectors?.length && <span className="text-xs text-[#5F6B76]">{dt('notAvailable', L)}</span>}
+                </div>
+              </div>
+              <div className="p-4 rounded-xl border border-[#DCE3EA]">
+                <div className={`${kpiLabelClass} text-[#245A91]`}>{dt('avgWage', L)}</div>
+                <div className="text-lg font-extrabold text-[#17365D] mt-1">
+                  {locationData?.insight?.averageMonthlyWage || dt('notAvailable', L)}
+                </div>
+              </div>
+              <div className="p-4 rounded-xl border border-[#DCE3EA]">
+                <div className={`${kpiLabelClass} text-[#17365D]`}>{dt('openVac', L)}</div>
+                <div className="text-lg font-extrabold text-[#17365D] mt-1">
+                  {locationData?.insight?.openVacanciesCount ?? jobs.length}
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          {/* Schemes */}
+          <Panel id="schemes-section">
+            <SectionHead icon="shieldCheck" tag={districtShort} title={dt('schemesTitle', L)} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+              {schemes.slice(0, 3).map((s) => (
+                <article key={s.id} className="p-4 rounded-xl border border-[#DCE3EA] bg-[#FBFCFD] flex flex-col gap-2.5">
+                  <h3 className="text-base font-extrabold text-[#17365D] leading-snug">{schemeName(s, L)}</h3>
+                  <div className="text-sm">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#287D73]">{dt('benefit', L)}</div>
+                    <p className="text-[#202B36]">{s.financialSupport || s.benefit}</p>
+                  </div>
+                  <div className="text-sm">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#245A91]">{dt('eligible', L)}</div>
+                    <p className="text-[#5F6B76]">{s.eligibility}</p>
+                  </div>
+                  <div className="text-sm mt-auto pt-2 border-t border-[#DCE3EA]">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#D9822B]">{dt('applyAt', L)}</div>
+                    <p className="font-semibold text-[#17365D]">{s.applyOffice}</p>
+                  </div>
+                </article>
               ))}
             </div>
-          </div>
+            {schemesAreFallback && <p className="mt-3 text-xs text-[#5F6B76]">{dt('schemeFallbackNote', L)}</p>}
+          </Panel>
 
-          <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-100 shadow-xs">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#245A91]">
-              औसत मासिक वेतन (Avg Monthly Wage)
-            </div>
-            <div className="text-base font-extrabold text-[#17365D] mt-1 font-['Bricolage_Grotesque']">
-              {locationData?.insight?.averageMonthlyWage || '₹12,000 - ₹22,000 / माह'}
-            </div>
-            <div className="text-[10px] text-[#5F6B76] mt-0.5">
-              कौशल व अनुभव के आधार पर
-            </div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-100 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[#17365D]">
-                नजदीकी ट्रेनिंग केंद्र (Verified Centers)
-              </div>
-              <div className="text-base font-extrabold text-[#17365D] mt-1">
-                {locationData?.trainingCenters?.length || 2}+ सरकारी संस्थान
-              </div>
-              <div className="text-[10px] text-[#5F6B76]">
-                RSETI, PMKK एवं ITI केंद्र
-              </div>
-            </div>
-            <button
-              onClick={() => go('training')}
-              className="mt-2 text-xs font-bold text-[#287D73] hover:underline inline-flex items-center gap-1"
-            >
-              <span>केंद्र देखें (View Centers)</span>
-              <Icon name="arrowR" size={12} />
-            </button>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-emerald-100 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[#17365D]">
-                उपलब्ध सरकारी योजनाएं (Schemes)
-              </div>
-              <div className="text-base font-extrabold text-[#17365D] mt-1">
-                {locationData?.schemes?.length || 3}+ कल्याणकारी योजनाएं
-              </div>
-              <div className="text-[10px] text-[#5F6B76]">
-                PM विश्वकर्मा, PMKVY 4.0, मुद्रा ऋण
-              </div>
-            </div>
-            <button
-              onClick={() => go('opportunities')}
-              className="mt-2 text-xs font-bold text-[#245A91] hover:underline inline-flex items-center gap-1"
-            >
-              <span>योजनाएं देखें (View Schemes)</span>
-              <Icon name="arrowR" size={12} />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Main Content Area: Suggested Skill Pathways, Learning Roadmap, Opportunities */}
-      <div className="space-y-8">
-        {/* Section 1: Suggested Skill Pathways */}
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <div>
-              <div className="text-xs uppercase font-extrabold tracking-widest text-[#245A91] mb-1">
-                Transparent Matching
-              </div>
-              <h2 className="text-2xl font-extrabold text-[#17365D]">
-                Suggested Skill Pathways · अनुशंसित कौशल मार्ग
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => go('assessment')}
-                className="px-3.5 py-1.5 rounded-xl bg-[#245A91] text-white text-xs font-bold hover:bg-[#17365D] transition-colors shadow-xs flex items-center gap-1.5"
-              >
-                <Icon name="mic" size={14} />
-                <span>पुनः आवाज़ मूल्यांकन (Retake Assessment)</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {topPaths.map((p, index) => (
-              <article
-                key={p.id}
-                className="bg-white border border-[#DCE3EA] rounded-3xl p-6 shadow-xs flex flex-col justify-between space-y-4 hover:border-[#245A91] transition-all"
-              >
-                <div className="space-y-3">
+          {/* Pathways */}
+          <section id="pathways-section" className="scroll-mt-28 space-y-3">
+            <SectionHead
+              tag={dt('pathTag', L)}
+              title={dt('pathTitle', L)}
+              right={
+                <button
+                  onClick={() => go('assessment')}
+                  className="min-h-11 px-4 rounded-xl bg-[#245A91] text-white text-sm font-bold hover:bg-[#17365D] shadow-xs flex items-center justify-center gap-2"
+                >
+                  <Icon name="mic" size={16} />
+                  {dt('retake', L)}
+                </button>
+              }
+            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {topPaths.map((p, index) => (
+                <article key={p.id} className="bg-white border border-[#DCE3EA] rounded-2xl p-5 shadow-xs flex flex-col gap-4 hover:border-[#245A91] transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-none ${
-                        index === 0
-                          ? 'bg-[#287D73]/15 text-[#287D73]'
-                          : index === 1
-                          ? 'bg-[#245A91]/15 text-[#245A91]'
-                          : 'bg-[#17365D]/10 text-[#17365D]'
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center flex-none ${
+                        index === 0 ? 'bg-[#287D73]/15 text-[#287D73]' : index === 1 ? 'bg-[#245A91]/15 text-[#245A91]' : 'bg-[#17365D]/10 text-[#17365D]'
                       }`}
                     >
                       <Icon name={p.icon} size={24} />
                     </div>
-                    <Ring value={p.score} />
+                    <Ring value={p.score} label={dt('kpiTop', L)} />
                   </div>
-
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wider text-[#287D73]">
-                      Recommendation #{index + 1}
+                      {dt('rec', L)} #{index + 1}
                     </div>
-                    <h3 className="text-lg font-bold text-[#17365D] leading-tight mt-0.5">
-                      {p.name}
-                    </h3>
-                    <div className="text-xs text-[#5F6B76] mt-0.5 font-['Hind']">
-                      {p.hi} · {p.role}
-                    </div>
+                    <h3 className="text-lg font-extrabold text-[#17365D] leading-tight mt-0.5">{pathwayName(p, L)}</h3>
+                    <div className="text-xs text-[#5F6B76] mt-0.5">{pathwayRole(p, L)}</div>
                   </div>
-
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <div className="flex flex-wrap gap-2 text-xs">
                     <span className="px-2.5 py-0.5 rounded-full bg-[#F5F7FA] text-[#5F6B76] border border-[#DCE3EA] flex items-center gap-1 font-medium">
-                      <Icon name="clock" size={12} /> {p.duration}
+                      <Icon name="clock" size={12} /> {localizeDuration(p.duration, L)}
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full bg-[#E3F1FA] text-[#245A91] flex items-center gap-1 font-semibold">
-                      <Icon name="layers" size={12} /> NSQF Level {p.nsqf}
+                      <Icon name="layers" size={12} /> {dt('nsqfLevel', L)} {p.nsqf}
                     </span>
                   </div>
+                  <p className="text-sm text-[#202B36] leading-relaxed">{fitText(p, L)}</p>
 
-                  <p className="text-xs text-[#202B36] font-medium leading-relaxed">
-                    {p.fit}
-                  </p>
-                </div>
-
-                <div className="space-y-2 pt-3 border-t border-[#DCE3EA]">
-                  <button
-                    onClick={() => toggleWhy(p.id)}
-                    className="w-full py-1.5 px-3 rounded-xl border border-[#DCE3EA] text-xs font-bold text-[#17365D] hover:bg-slate-50 transition-colors flex items-center justify-between"
-                    aria-expanded={Boolean(expandedWhy[p.id])}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Icon name="bulb" size={14} />
-                      Why this recommendation?
-                    </span>
-                    <Icon
-                      name="chev"
-                      size={12}
-                      className={`transition-transform duration-200 ${
-                        expandedWhy[p.id] ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setSelectedPathId(p.id);
-                      scrollToSection('roadmap-section');
-                    }}
-                    className="w-full py-2 px-3 rounded-xl bg-[#245A91] text-white text-xs font-bold hover:bg-[#17365D] transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Icon name="route" size={14} />
-                    View Learning Roadmap
-                  </button>
-
-                  {/* Factor Breakdown Accordion */}
-                  {expandedWhy[p.id] && (
-                    <div className="mt-3 pt-3 border-t border-dashed border-[#DCE3EA] space-y-2 bg-[#F5F7FA] p-3 rounded-2xl">
-                      <div className="text-[11px] font-bold text-[#17365D]">
-                        Scoring Breakdown (Capped: {p.score}/100)
-                      </div>
-                      <div className="space-y-1.5">
-                        {p.factors.map((factor) => (
-                          <div key={factor.k} className="text-[11px] space-y-0.5">
-                            <div className="flex justify-between items-center font-semibold">
-                              <span>{factor.label}</span>
-                              <span className="font-bold tabular-nums text-[#287D73]">
-                                +{factor.pts} pts
-                              </span>
+                  <div className="space-y-2 mt-auto pt-3 border-t border-[#DCE3EA]">
+                    <button
+                      onClick={() => toggleWhy(p.id)}
+                      aria-expanded={Boolean(expandedWhy[p.id])}
+                      className="w-full min-h-11 px-3 rounded-xl border border-[#DCE3EA] text-sm font-bold text-[#17365D] hover:bg-[#F5F7FA] flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Icon name="bulb" size={16} />
+                        {dt('whyBtn', L)}
+                      </span>
+                      <Icon name="chev" size={14} className={expandedWhy[p.id] ? 'rotate-180' : ''} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedPathId(p.id);
+                        scrollToSection('roadmap-section');
+                      }}
+                      className="w-full min-h-11 px-3 rounded-xl bg-[#245A91] text-white text-sm font-bold hover:bg-[#17365D] flex items-center justify-center gap-2"
+                    >
+                      <Icon name="route" size={16} />
+                      {dt('viewRoad', L)}
+                    </button>
+                    {expandedWhy[p.id] && (
+                      <div className="mt-2 p-3 rounded-xl bg-[#F5F7FA] border border-dashed border-[#C5D1DD] space-y-2">
+                        <div className="text-xs font-bold text-[#17365D]">{dt('breakdown', L)}: {p.score}/100</div>
+                        {p.factors.map((f) => (
+                          <div key={f.k} className="text-xs">
+                            <div className="flex justify-between font-semibold">
+                              <span>{factorLabel(f.k, f.label, L)}</span>
+                              <span className={`tabular-nums ${f.pts < 0 ? 'text-[#9E2A2B]' : 'text-[#287D73]'}`}>{f.pts > 0 ? '+' : ''}{f.pts}</span>
                             </div>
-                            <p className="text-[10px] text-[#5F6B76]">
-                              {factor.note}
-                            </p>
+                            <p className="text-[#5F6B76]">{factorNote(f.k, f.pts, f.note, L)}</p>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        {/* Section 2: Interactive Learning Roadmap */}
-        <section
-          id="roadmap-section"
-          className="bg-white border border-[#DCE3EA] rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 scroll-mt-24"
-        >
-          <div>
-            <div className="text-xs uppercase font-extrabold tracking-widest text-[#245A91] mb-1">
-              Structured Steps
-            </div>
-            <h2 className="text-2xl font-extrabold text-[#17365D]">
-              Your Learning Roadmap · चरणबद्ध रोडमैप
-            </h2>
-            <p className="text-xs sm:text-sm text-[#5F6B76] mt-1">
-              Three progressive learning stages for your chosen pathway. Mark stages as done to track your milestones.
-            </p>
-          </div>
-
-          {/* Pathway Selector Tabs */}
-          <div className="flex flex-wrap gap-2">
-            {topPaths.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedPathId(p.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  selectedPathId === p.id
-                    ? 'bg-[#17365D] text-white shadow-xs'
-                    : 'bg-[#F5F7FA] text-[#5F6B76] border border-[#DCE3EA] hover:bg-slate-200'
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Stages Timeline */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {selectedPathway.stages.map((stage, idx) => {
-              const stageKey = selectedPathway.id + idx;
-              const isDone = Boolean(doneStages[stageKey]);
-
-              return (
-                <div
-                  key={stageKey}
-                  className={`p-5 rounded-2xl border transition-all flex flex-col justify-between space-y-3 relative overflow-hidden ${
-                    isDone
-                      ? 'border-[#287D73] bg-[#287D73]/5'
-                      : 'border-[#DCE3EA] bg-[#F5F7FA]'
-                  }`}
-                >
-                  {celebratedStageKey === stageKey && (
-                    <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center bg-[#287D73]/15 backdrop-blur-[1px] animate-fade-in">
-                      <div className="bg-white text-[#287D73] px-3.5 py-2 rounded-2xl shadow-xl border border-[#287D73]/30 font-extrabold text-xs flex items-center gap-1.5 animate-bounce">
-                        <Icon name="sparkles" size={16} className="text-[#D9822B]" />
-                        <span>🎉 चरण पूर्ण! (Stage Completed)</span>
-                        <Icon name="check" size={16} className="text-[#287D73]" />
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#287D73]">
-                      Stage {idx + 1} · {STAGE_TITLES[idx]}
-                    </div>
-                    <h4 className="text-base font-bold text-[#17365D] leading-snug">
-                      {stage[0]}
-                    </h4>
-                    <p className="text-xs text-[#5F6B76] leading-relaxed">
-                      {stage[1]}
-                    </p>
+                    )}
                   </div>
-
-                  <div className="pt-2 flex items-center justify-between border-t border-[#DCE3EA]">
-                    <span className="text-[11px] font-bold text-[#17365D]">
-                      {stage[2]}
-                    </span>
-                    <button
-                      onClick={() => toggleStageDone(stageKey)}
-                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                        isDone
-                          ? 'bg-[#287D73] text-white'
-                          : 'bg-white border border-[#DCE3EA] text-[#5F6B76] hover:border-[#287D73]'
-                      }`}
-                    >
-                      <Icon name="check" size={14} />
-                      {isDone ? 'Completed' : 'Mark done'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Roadmap Progress Bar */}
-          <div className="flex items-center gap-3 pt-2 text-xs font-bold text-[#5F6B76]">
-            <span>{completedCount} of 3 stages completed</span>
-            <div className="flex-1 bg-[#F5F7FA] border border-[#DCE3EA] h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-[#287D73] h-full rounded-full transition-all duration-300"
-                style={{ width: `${(completedCount / 3) * 100}%` }}
-              />
+                </article>
+              ))}
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* Section 3: Hyperlocal Opportunities */}
-        <section
-          id="opportunities-section"
-          className="space-y-4 scroll-mt-24"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase font-extrabold tracking-widest text-[#245A91] mb-1">
-                📍 {locationData?.district || profile.location || 'स्थानीय'} Livelihood Openings
-              </div>
-              <h2 className="text-2xl font-extrabold text-[#17365D]">
-                Matched Opportunities · {locationData?.district || profile.location || 'स्थानीय'} के रोजगार व प्रशिक्षण
-              </h2>
-              <div className="flex items-center gap-2 mt-1 text-xs text-[#5F6B76]">
-                <span className="inline-flex items-center gap-1 font-bold text-[#287D73]">
-                  <Icon name="check" size={13} />
-                  <span>{locationData?.district || profile.location || 'स्थानीय'} के अनुसार सत्यापित अवसर</span>
-                </span>
-                <span>·</span>
-                <span>{filteredJobs.length} अवसर उपलब्ध</span>
-              </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-1 bg-[#F5F7FA] p-1 rounded-xl border border-[#DCE3EA] text-xs font-bold">
-              {(['All', 'Job', 'Self-employment'] as const).map((filter) => (
+          {/* Roadmap */}
+          <Panel id="roadmap-section">
+            <SectionHead icon="route" tag={dt('roadTag', L)} title={dt('roadTitle', L)} />
+            <p className="text-sm text-[#5F6B76] -mt-2 mb-4">{dt('roadSub', L)}</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {topPaths.map((p) => (
                 <button
-                  key={filter}
-                  onClick={() => setJobFilter(filter)}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    jobFilter === filter
-                      ? 'bg-white text-[#17365D] shadow-xs'
-                      : 'text-[#5F6B76] hover:text-[#202B36]'
+                  key={p.id}
+                  onClick={() => setSelectedPathId(p.id)}
+                  aria-pressed={selectedPathId === p.id}
+                  className={`min-h-11 px-4 rounded-xl text-sm font-bold ${
+                    selectedPathId === p.id ? 'bg-[#17365D] text-white' : 'bg-[#F5F7FA] text-[#5F6B76] border border-[#DCE3EA] hover:bg-slate-200'
                   }`}
                 >
-                  {filter}
+                  {pathwayName(p, L)}
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Opportunities Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {filteredJobs.map((job) => {
-              const isShortlisted = Boolean(shortlist[job.id]);
-
-              return (
-                <article
-                  key={job.id}
-                  className={`bg-white border rounded-3xl p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-[#245A91] transition-all ${
-                    job.inRange
-                      ? 'border-[#DCE3EA]'
-                      : 'border-dashed border-[#DCE3EA] opacity-80'
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                            job.type === 'Job'
-                              ? 'bg-[#E3F1FA] text-[#245A91]'
-                              : 'bg-[#287D73]/15 text-[#287D73]'
-                          }`}
-                        >
-                          {job.type}
-                        </span>
-                        {job.verified && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#287D73]/15 text-[#287D73] flex items-center gap-1">
-                            <Icon name="check" size={10} /> Verified
-                          </span>
-                        )}
+            <ol className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[0, 1, 2].map((idx) => {
+                const stageKey = selectedPathway.id + idx;
+                const isDone = Boolean(doneStages[stageKey]);
+                const st = stageText(selectedPathway, idx, L);
+                return (
+                  <li
+                    key={stageKey}
+                    className={`p-4 rounded-xl border flex flex-col gap-3 relative overflow-hidden ${
+                      isDone ? 'border-[#287D73] bg-[#287D73]/5' : 'border-[#DCE3EA] bg-[#F5F7FA]'
+                    }`}
+                  >
+                    {celebratedStageKey === stageKey && (
+                      <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center bg-[#287D73]/15">
+                        <div className="bg-white text-[#287D73] px-3 py-2 rounded-xl shadow-xl border border-[#287D73]/30 font-extrabold text-xs flex items-center gap-1.5 animate-bounce">
+                          <Icon name="sparkles" size={16} className="text-[#D9822B]" />
+                          {dt('stageDone', L)}
+                        </div>
                       </div>
-                    </div>
-
+                    )}
                     <div>
-                      <h4 className="text-base font-bold text-[#17365D] leading-snug">
-                        {job.title}
-                      </h4>
-                      <div className="text-xs text-[#5F6B76] mt-0.5">
-                        {job.org}
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-[#287D73]">
+                        {dt('stage', L)} {idx + 1} · {STAGE_TITLES_L10N[L][idx]}
                       </div>
+                      <h4 className="text-base font-extrabold text-[#17365D] leading-snug mt-1">{st.title}</h4>
+                      <p className="text-sm text-[#5F6B76] leading-relaxed mt-1">{st.desc}</p>
                     </div>
-
-                    <div className="p-3 bg-[#F5F7FA] rounded-2xl border border-[#DCE3EA] space-y-1 text-xs">
-                      <div className="flex items-center gap-1.5 text-[#17365D] font-bold">
-                        <Icon name="pin" size={14} />
-                        <span>{job.loc} · {kmLabel(job)}</span>
-                      </div>
-                      <div className="font-bold text-[#287D73]">
-                        {job.pay}
-                      </div>
+                    <div className="mt-auto pt-3 flex items-center justify-between gap-2 border-t border-[#DCE3EA]">
+                      <span className="text-xs font-bold text-[#17365D]">{st.when}</span>
+                      <button
+                        onClick={() => toggleStageDone(stageKey)}
+                        aria-pressed={isDone}
+                        className={`min-h-11 inline-flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-bold ${
+                          isDone ? 'bg-[#287D73] text-white' : 'bg-white border border-[#C5D1DD] text-[#17365D] hover:border-[#287D73]'
+                        }`}
+                      >
+                        <Icon name="check" size={16} />
+                        {isDone ? dt('completed', L) : dt('markDone', L)}
+                      </button>
                     </div>
-                  </div>
+                  </li>
+                );
+              })}
+            </ol>
+            <div className="flex items-center gap-3 pt-4 text-sm font-bold text-[#5F6B76]">
+              <span className="whitespace-nowrap">{dt('stagesDoneLine', L, { c: completedCount, n: 3 })}</span>
+              <div className="flex-1 bg-[#F5F7FA] border border-[#DCE3EA] h-2 rounded-full overflow-hidden">
+                <div className="bg-[#287D73] h-full rounded-full transition-all" style={{ width: `${(completedCount / 3) * 100}%` }} />
+              </div>
+            </div>
+          </Panel>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-[#DCE3EA]">
+          {/* Openings */}
+          <Panel id="opportunities-section">
+            <SectionHead
+              icon="briefcase"
+              tag={dt('openTag', L, { loc: districtShort || '—' })}
+              title={dt('openTitle', L)}
+              right={
+                <div role="tablist" className="flex items-center gap-1 bg-[#F5F7FA] p-1 rounded-xl border border-[#DCE3EA] text-sm font-bold self-start">
+                  {(['All', 'Job', 'Self-employment'] as const).map((f) => (
                     <button
-                      onClick={() => onSelectDetail(job)}
-                      className="text-xs font-bold text-[#245A91] hover:underline"
+                      key={f}
+                      role="tab"
+                      aria-selected={jobFilter === f}
+                      onClick={() => setJobFilter(f)}
+                      className={`min-h-10 px-3 rounded-lg ${jobFilter === f ? 'bg-white text-[#17365D] shadow-xs' : 'text-[#5F6B76] hover:text-[#202B36]'}`}
                     >
-                      Details →
+                      {f === 'All' ? dt('filterAll', L) : f === 'Job' ? dt('filterJob', L) : dt('filterSelf', L)}
                     </button>
+                  ))}
+                </div>
+              }
+            />
 
+            {filteredJobs.length === 0 ? (
+              <p className="text-sm text-[#5F6B76] py-6 text-center">{dt('noJobs', L)}</p>
+            ) : (
+              <>
+                {/* Table for tablets and laptops */}
+                <div className="hidden md:block overflow-x-auto rounded-xl border border-[#DCE3EA]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-[#17365D] text-white text-left">
+                      <tr>
+                        <th className="px-4 py-3 font-bold">{dt('colRole', L)}</th>
+                        <th className="px-4 py-3 font-bold">{dt('colType', L)}</th>
+                        <th className="px-4 py-3 font-bold">{dt('colPlace', L)}</th>
+                        <th className="px-4 py-3 font-bold">{dt('colPay', L)}</th>
+                        <th className="px-4 py-3 font-bold text-right">{dt('colAction', L)}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#DCE3EA]">
+                      {filteredJobs.map((job, i) => {
+                        const saved = Boolean(shortlist[job.id]);
+                        return (
+                          <tr key={job.id} className={`${i % 2 ? 'bg-[#FBFCFD]' : 'bg-white'} ${job.inRange ? '' : 'opacity-75'}`}>
+                            <td className="px-4 py-3 align-top max-w-[260px]">
+                              <div className="font-extrabold text-[#17365D] leading-snug">{job.title}</div>
+                              <div className="text-xs text-[#5F6B76]">{job.org}</div>
+                              {job.verified && (
+                                <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold text-[#287D73]">
+                                  <Icon name="check" size={11} /> {dt('verified', L)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${job.type === 'Job' ? 'bg-[#E3F1FA] text-[#245A91]' : 'bg-[#287D73]/15 text-[#287D73]'}`}>
+                                {opportunityTypeLabel(job.type, L)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <div className="font-semibold text-[#17365D]">{job.loc}</div>
+                              <div className="text-xs text-[#5F6B76]">{distanceLabel(job.km, L)}</div>
+                              {!job.inRange && <div className="text-[11px] text-[#9E2A2B] font-semibold">{dt('outRange', L)}</div>}
+                            </td>
+                            <td className="px-4 py-3 align-top font-bold text-[#287D73]">{job.pay}</td>
+                            <td className="px-4 py-3 align-top">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleReadJob(job)}
+                                  aria-label={`${dt('listen', L)}: ${job.title}`}
+                                  className={`w-10 h-10 rounded-lg border flex items-center justify-center ${readingJobId === job.id ? 'bg-[#38BDF8] border-[#38BDF8] text-[#17365D]' : 'border-[#C5D1DD] text-[#245A91] hover:bg-[#F5F7FA]'}`}
+                                >
+                                  <Icon name={readingJobId === job.id ? 'volumeX' : 'volume2'} size={16} />
+                                </button>
+                                <button
+                                  onClick={() => onSelectDetail(job)}
+                                  className="min-h-10 px-3 rounded-lg border border-[#C5D1DD] text-xs font-bold text-[#245A91] hover:bg-[#F5F7FA]"
+                                >
+                                  {dt('details', L)}
+                                </button>
+                                <button
+                                  onClick={() => toggleShortlist(job.id)}
+                                  aria-pressed={saved}
+                                  className={`min-h-10 px-3 rounded-lg text-xs font-bold flex items-center gap-1 ${saved ? 'bg-[#FFF4DB] text-[#B8691A] border border-[#EBCB7A]' : 'bg-white border border-[#C5D1DD] text-[#5F6B76] hover:border-[#245A91]'}`}
+                                >
+                                  <Icon name="star" size={13} className={saved ? 'fill-[#D9822B]' : ''} />
+                                  {saved ? dt('savedBtn', L) : dt('saveBtn', L)}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Cards for phones */}
+                <div className="md:hidden grid grid-cols-1 gap-3">
+                  {filteredJobs.map((job) => {
+                    const saved = Boolean(shortlist[job.id]);
+                    return (
+                      <article key={job.id} className={`border rounded-xl p-4 space-y-3 ${job.inRange ? 'border-[#DCE3EA]' : 'border-dashed border-[#C5D1DD] opacity-80'}`}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${job.type === 'Job' ? 'bg-[#E3F1FA] text-[#245A91]' : 'bg-[#287D73]/15 text-[#287D73]'}`}>
+                            {opportunityTypeLabel(job.type, L)}
+                          </span>
+                          {job.verified && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#287D73]">
+                              <Icon name="check" size={11} /> {dt('verified', L)}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-base font-extrabold text-[#17365D] leading-snug">{job.title}</h4>
+                          <div className="text-xs text-[#5F6B76]">{job.org}</div>
+                        </div>
+                        <div className="p-3 bg-[#F5F7FA] rounded-lg text-sm space-y-1">
+                          <div className="flex items-center gap-1.5 font-semibold text-[#17365D]">
+                            <Icon name="pin" size={14} />
+                            <span>{job.loc} · {distanceLabel(job.km, L)}</span>
+                          </div>
+                          {!job.inRange && <div className="text-xs text-[#9E2A2B] font-semibold">{dt('outRange', L)}</div>}
+                          <div className="font-extrabold text-[#287D73]">{job.pay}</div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => handleReadJob(job)}
+                            aria-label={`${dt('listen', L)}: ${job.title}`}
+                            className={`min-h-11 rounded-lg border text-xs font-bold flex items-center justify-center gap-1 ${readingJobId === job.id ? 'bg-[#38BDF8] border-[#38BDF8] text-[#17365D]' : 'border-[#C5D1DD] text-[#245A91]'}`}
+                          >
+                            <Icon name={readingJobId === job.id ? 'volumeX' : 'volume2'} size={16} />
+                            {readingJobId === job.id ? dt('stopListen', L) : dt('listen', L)}
+                          </button>
+                          <button
+                            onClick={() => onSelectDetail(job)}
+                            className="min-h-11 rounded-lg border border-[#C5D1DD] text-xs font-bold text-[#245A91]"
+                          >
+                            {dt('details', L)}
+                          </button>
+                          <button
+                            onClick={() => toggleShortlist(job.id)}
+                            aria-pressed={saved}
+                            className={`min-h-11 rounded-lg text-xs font-bold flex items-center justify-center gap-1 ${saved ? 'bg-[#FFF4DB] text-[#B8691A] border border-[#EBCB7A]' : 'bg-white border border-[#C5D1DD] text-[#5F6B76]'}`}
+                          >
+                            <Icon name="star" size={14} className={saved ? 'fill-[#D9822B]' : ''} />
+                            {saved ? dt('savedBtn', L) : dt('saveBtn', L)}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            <p className="mt-4 text-xs text-[#5F6B76]">{dt('sourceNote', L)}</p>
+          </Panel>
+
+          {/* Training centers */}
+          <Panel id="centers-section">
+            <SectionHead
+              icon="cap"
+              tag={districtShort}
+              title={dt('centersTitle', L)}
+              right={
+                <button
+                  onClick={() => go('training')}
+                  className="min-h-11 px-4 rounded-xl bg-white border border-[#C5D1DD] text-[#17365D] hover:bg-[#F5F7FA] text-sm font-bold flex items-center justify-center gap-2 self-start"
+                >
+                  {dt('seeAll', L)}
+                  <Icon name="arrowR" size={14} />
+                </button>
+              }
+            />
+            {centers.length === 0 ? (
+              <p className="text-sm text-[#5F6B76]">{dt('noCenters', L)}</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                {centers.slice(0, 3).map((c) => (
+                  <article key={c.id} className="p-4 rounded-xl border border-[#DCE3EA] flex flex-col gap-2">
+                    <h3 className="text-base font-extrabold text-[#17365D] leading-snug">{c.title}</h3>
+                    <div className="text-xs text-[#5F6B76]">{c.org}</div>
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-[#17365D]">
+                      <Icon name="pin" size={14} />
+                      {c.loc} · {distanceLabel(c.km, L)}
+                    </div>
+                    <div className="text-sm font-bold text-[#287D73]">{c.pay}</div>
                     <button
-                      onClick={() => toggleShortlist(job.id)}
-                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        isShortlisted
-                          ? 'bg-[#FFF4DB] text-[#D9822B] border border-[#EBCB7A]'
-                          : 'bg-white border border-[#DCE3EA] text-[#5F6B76] hover:border-[#245A91]'
-                      }`}
+                      onClick={() => onSelectDetail(c)}
+                      className="mt-auto min-h-11 rounded-lg border border-[#C5D1DD] text-sm font-bold text-[#245A91] hover:bg-[#F5F7FA]"
                     >
-                      <Icon name="star" size={14} className={isShortlisted ? 'fill-[#D9822B]' : ''} />
-                      {isShortlisted ? 'Saved' : 'Save'}
+                      {dt('details', L)}
                     </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
+                  </article>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
       </div>
     </main>
   );

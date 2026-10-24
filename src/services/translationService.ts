@@ -20,7 +20,7 @@ export const t = (key: string, lang: SupportedLanguage = 'hi'): string => {
     'btn.dashboard': { hi: 'डैशबोर्ड देखें', bho: 'डैशबोर्ड देखीं', en: 'View Dashboard', hin: 'View Dashboard' },
     'btn.exploreJobs': { hi: 'नौकरी के अवसर देखें', bho: 'रोजगार देखीं', en: 'Explore Job Openings', hin: 'Explore Job Openings' },
     'btn.exploreTraining': { hi: 'प्रशिक्षण केंद्र देखें', bho: 'प्रशिक्षण केंद्र देखीं', en: 'Explore Training Centers', hin: 'Explore Training Centers' },
-    'btn.exportPdf': { hi: 'रोडमैप PDF डाउनलोड करें', bho: 'रोडमैップ PDF डाउनलोड करीं', en: 'Export Roadmap PDF', hin: 'Export Roadmap PDF' },
+    'btn.exportPdf': { hi: 'रोडमैप PDF डाउनलोड करें', bho: 'रोडमैप PDF डाउनलोड करीं', en: 'Export Roadmap PDF', hin: 'Export Roadmap PDF' },
     'btn.audioSummary': { hi: 'रोडमैप सुनें (Audio)', bho: 'रोडमैप सुनीं (Audio)', en: 'Listen Roadmap (Audio)', hin: 'Listen Roadmap (Audio)' },
 
     // Status & Labels

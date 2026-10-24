@@ -1,0 +1,1056 @@
+<title>JeevikaAI</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Hind:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky nav under a thin demo ribbon; navy hero band with a floating dashboard preview;
+   light content sections; assessment = voice stage + conversation card; dashboard = profile rail + roadmap stack */
+:root{
+  --bg:#F3F6FA; --surface:#FFFFFF; --surface-2:#EAF0F7; --ink:#0E2238; --ink-2:#4B607A; --line:#D9E3EE;
+  --navy:#163A63; --blue:#1479BD; --teal:#18A999;
+  --link:#1479BD; --teal-ink:#0C7F72; --chip-bg:#E3F1FA; --chip-ink:#0F5E93; --logo-ink:#163A63;
+  --warn-bg:#FFF4DB; --warn-ink:#6B4700; --warn-line:#EBCB7A;
+  --bad:#B3402A;
+  --on-hero:#FFFFFF; --on-hero-2:#C9DAEC;
+  --shadow:0 1px 2px rgba(14,34,56,.06),0 8px 24px rgba(14,34,56,.07);
+  --shadow-lg:0 24px 60px rgba(6,20,40,.35);
+  --f-display:'Bricolage Grotesque','Hind',system-ui,sans-serif;
+  --f-body:'Hind',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A1828; --surface:#10253B; --surface-2:#16304C; --ink:#E6EEF7; --ink-2:#9DB2C8; --line:#244262;
+    --link:#5DB4EE; --teal-ink:#3FD2C0; --chip-bg:#16395A; --chip-ink:#9ED3F5; --logo-ink:#EAF2FA;
+    --warn-bg:#3A2E10; --warn-ink:#F2D58B; --warn-line:#6B5517; --bad:#F08A72;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A1828; --surface:#10253B; --surface-2:#16304C; --ink:#E6EEF7; --ink-2:#9DB2C8; --line:#244262;
+  --link:#5DB4EE; --teal-ink:#3FD2C0; --chip-bg:#16395A; --chip-ink:#9ED3F5; --logo-ink:#EAF2FA;
+  --warn-bg:#3A2E10; --warn-ink:#F2D58B; --warn-line:#6B5517; --bad:#F08A72;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--f-body);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--f-display);line-height:1.12;margin:0;text-wrap:balance;letter-spacing:-.015em}
+h2{font-size:clamp(1.55rem,3vw,2.15rem);font-weight:700}
+h3{font-size:1.2rem;font-weight:700}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+[id]{scroll-margin-top:92px}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.wrap{width:100%;max-width:1200px;margin-inline:auto;padding-inline:max(16px,4vw)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.muted{color:var(--ink-2)}
+
+/* ribbon + nav */
+.ribbon{background:#0B2442;color:#CFE0F1;font-size:.78rem}
+.ribbon .wrap{display:flex;gap:12px;justify-content:space-between;align-items:center;padding-block:7px}
+.badge{display:inline-flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.07em;font-size:.72rem;color:#fff;background:rgba(24,169,153,.22);border:1px solid rgba(24,169,153,.6);padding:3px 11px;border-radius:999px;white-space:nowrap}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:#2EDDC7}
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--surface);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;gap:16px;min-height:64px}
+.logo{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0}
+.logo-text{font:800 1.4rem/1 var(--f-display);color:var(--logo-ink);letter-spacing:-.02em}
+.logo-text b{color:var(--teal);font-weight:800}
+.logo.inverse .logo-text{color:#fff}
+.nav-links{display:flex;gap:4px;margin-left:14px}
+.nav-links button,.nav-panel button{background:none;border:0;padding:10px 14px;border-radius:10px;font-weight:600;color:var(--ink-2)}
+.nav-links button:hover,.nav-panel button:hover{background:var(--surface-2);color:var(--ink)}
+.nav-links button[aria-current="page"]{color:var(--link)}
+.nav-cta{margin-left:auto}
+.menu-btn{display:none;margin-left:8px;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);align-items:center;justify-content:center;color:var(--ink)}
+.nav-panel{display:none;border-top:1px solid var(--line);padding-block:8px 12px}
+.nav-panel .wrap{display:grid;gap:4px}
+.nav-panel button{text-align:left}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:48px;padding:12px 22px;border-radius:12px;border:1.5px solid transparent;font-weight:700;font-size:1rem;line-height:1.2;transition:transform .15s,box-shadow .15s,background .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:none}
+.btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
+.btn-teal{background:var(--teal);color:#06263F;box-shadow:0 8px 22px rgba(24,169,153,.35)}
+.btn-teal:hover{background:#21BBAA}
+.btn-primary{background:var(--blue);color:#fff;box-shadow:0 8px 20px rgba(20,121,189,.28)}
+.btn-primary:hover{background:#1A86CE}
+.btn-ghost{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--blue)}
+.btn-light{background:transparent;border-color:rgba(255,255,255,.5);color:#fff}
+.btn-light:hover{background:rgba(255,255,255,.1)}
+.btn-text{background:none;border:0;color:var(--link);font-weight:700;padding:8px 4px;min-height:40px;display:inline-flex;align-items:center;gap:8px}
+.btn-sm{min-height:40px;padding:8px 14px;font-size:.92rem}
+
+/* hero */
+.hero{position:relative;color:var(--on-hero);overflow:hidden;
+  background:radial-gradient(900px 420px at 88% 8%,rgba(24,169,153,.38),transparent 60%),radial-gradient(700px 520px at 0% 100%,rgba(20,121,189,.5),transparent 60%),linear-gradient(135deg,#0E2E50 0%,#163A63 60%,#12507F 100%)}
+.hero::before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.14) 1px,transparent 1.3px);background-size:22px 22px;-webkit-mask-image:linear-gradient(180deg,#000,transparent 88%);mask-image:linear-gradient(180deg,#000,transparent 88%)}
+.hero .wrap{position:relative}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(28px,4vw,56px);align-items:center;padding-block:clamp(28px,5vw,60px) clamp(36px,6vw,72px)}
+.eyebrow-light{display:inline-flex;align-items:center;gap:8px;font-size:.82rem;font-weight:600;letter-spacing:.04em;color:#BFF3EA;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);padding:6px 12px;border-radius:999px}
+.hero-title{font-size:clamp(2.3rem,5.2vw,3.75rem);font-weight:800;margin:18px 0 16px;letter-spacing:-.025em}
+.hero-title span{display:block}
+.hero-title span:last-child{color:#5EE6D2}
+.hero-sub{font-size:1.1rem;color:var(--on-hero-2);max-width:52ch}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
+.proof{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:24px;font-size:.92rem;color:var(--on-hero-2);list-style:none;padding:0}
+.proof li{display:flex;align-items:center;gap:7px}
+.proof svg{color:#5EE6D2}
+
+.preview-wrap{position:relative;padding-top:18px}
+.voice-chip{position:absolute;z-index:2;left:14px;top:0;display:flex;align-items:center;gap:12px;background:#0B2442;border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:14px;padding:9px 14px 9px 10px;box-shadow:0 12px 30px rgba(0,0,0,.35);animation:floaty 5s ease-in-out infinite}
+.vc-icon{width:32px;height:32px;border-radius:50%;background:var(--teal);color:#06263F;display:grid;place-items:center;flex:none}
+.vc-label{font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:#9FC3E4}
+.vc-text{font-weight:600;font-size:.98rem}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.preview{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow-lg);padding:46px 22px 20px}
+.pv-head{display:flex;gap:12px;align-items:center}
+.avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));color:#fff;display:grid;place-items:center;font:700 1.15rem var(--f-display);flex:none}
+.avatar.lg{width:56px;height:56px;font-size:1.4rem}
+.pv-name{font-weight:700;line-height:1.2}
+.pv-meta{font-size:.85rem;color:var(--ink-2);display:flex;align-items:center;gap:5px}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:999px;background:var(--chip-bg);color:var(--chip-ink);white-space:nowrap}
+.tag-warn{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line)}
+.tag-teal{background:rgba(24,169,153,.16);color:var(--teal-ink)}
+.tag-mute{background:var(--surface-2);color:var(--ink-2)}
+.pv-head .tag{margin-left:auto}
+.pv-label{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);font-weight:700;margin:18px 0 9px}
+.bar-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;align-items:center;margin-bottom:11px;font-size:.93rem;font-weight:600}
+.bar-row span:last-child{font-variant-numeric:tabular-nums;color:var(--teal-ink)}
+.bar{grid-column:1/-1;height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),var(--teal));animation:grow 1.1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{width:0}}
+.pv-row{display:flex;gap:12px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;background:var(--bg)}
+.pv-row .icon-tile{width:38px;height:38px;border-radius:11px}
+.pv-row b{display:block;font-size:.93rem;line-height:1.25}
+.pv-row small{color:var(--ink-2);font-size:.82rem}
+.pv-row .pay{margin-left:auto;font-weight:700;font-size:.85rem;color:var(--teal-ink);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* sections */
+.section{padding-block:clamp(40px,6vw,76px)}
+.section-head{max-width:640px;margin-bottom:28px}
+.eyebrow{font-size:.76rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--teal-ink);margin-bottom:10px}
+.section-head p{color:var(--ink-2);margin-top:10px;font-size:1.05rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:24px}
+.card h3{margin:16px 0 8px}
+.card p{color:var(--ink-2)}
+.icon-tile{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;flex:none}
+.tile-blue{background:var(--chip-bg);color:var(--link)}
+.tile-teal{background:rgba(24,169,153,.16);color:var(--teal-ink)}
+.tile-navy{background:var(--navy);color:#fff}
+.card .chips{margin-top:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:var(--chip-bg);color:var(--chip-ink);font-size:.85rem;font-weight:600;border:1px solid transparent}
+button.chip{cursor:pointer}
+button.chip:hover{border-color:var(--blue)}
+button.chip[aria-pressed="true"]{background:var(--blue);color:#fff}
+
+.band{background:var(--surface);border-block:1px solid var(--line)}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;list-style:none;padding:0;margin:0}
+.step{position:relative;background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:22px}
+.step:not(:last-child)::after{content:"";position:absolute;right:-18px;top:44px;width:18px;height:2px;background:var(--teal)}
+.step-top{display:flex;align-items:center;justify-content:space-between}
+.step-n{font:800 1.9rem var(--f-display);color:var(--line)}
+.step h3{margin:14px 0 6px;font-size:1.1rem}
+.step p{color:var(--ink-2);font-size:.95rem}
+.cta-band{border-radius:24px;padding:clamp(24px,4vw,44px);color:#fff;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;background:linear-gradient(120deg,#163A63,#12507F 70%,#16806F)}
+.cta-band h2{max-width:20ch}
+.cta-band p{color:var(--on-hero-2);margin-top:8px;max-width:48ch}
+
+.footer{background:#0B2442;color:#B9CCE0;padding-block:36px 28px}
+.footer-grid{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:flex-start}
+.footer p{max-width:62ch;font-size:.9rem;margin-top:12px}
+.footer .fine{border-top:1px solid rgba(255,255,255,.12);margin-top:24px;padding-top:16px;font-size:.82rem;color:#8FA9C4;max-width:none}
+.team{font-weight:700;color:#fff}
+
+/* assessment */
+.assess{padding-block:22px 56px}
+.back-link{display:inline-flex;gap:8px;align-items:center;background:none;border:0;color:var(--ink-2);font-weight:600;padding:8px 0}
+.assess-head{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;margin:6px 0 22px}
+.assess-head p{color:var(--ink-2);margin-top:8px;max-width:56ch}
+.assess-head h1{font-size:clamp(1.8rem,3.6vw,2.6rem);font-weight:800}
+.assess-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:22px;align-items:start}
+.stage{text-align:center}
+.seg{display:inline-grid;grid-auto-flow:column;gap:4px;background:var(--surface-2);padding:4px;border-radius:14px;max-width:100%}
+.seg button{border:0;background:transparent;padding:10px 16px;border-radius:10px;font-weight:700;color:var(--ink-2);min-height:44px}
+.seg button small{display:block;font-weight:500;font-size:.72rem;line-height:1.1}
+.seg button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.mic-wrap{display:grid;place-items:center;padding:26px 0 8px}
+.mic{position:relative;width:136px;height:136px;border-radius:50%;border:0;background:linear-gradient(145deg,var(--blue),var(--navy));color:#fff;display:grid;place-items:center;box-shadow:0 14px 34px rgba(20,121,189,.38)}
+.mic::before,.mic::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--teal);opacity:0}
+.mic.idle{animation:breathe 3.2s ease-in-out infinite}
+.mic.live{background:linear-gradient(145deg,#1FC2B0,#0E7C70)}
+.mic.live::before{animation:ring 1.8s ease-out infinite}
+.mic.live::after{animation:ring 1.8s ease-out .9s infinite}
+@keyframes ring{0%{transform:scale(1);opacity:.75}100%{transform:scale(1.75);opacity:0}}
+@keyframes breathe{0%,100%{box-shadow:0 14px 34px rgba(20,121,189,.38),0 0 0 0 rgba(24,169,153,0)}50%{box-shadow:0 14px 34px rgba(20,121,189,.38),0 0 0 16px rgba(24,169,153,.16)}}
+.wave{display:flex;gap:4px;height:30px;align-items:center;justify-content:center;margin:10px 0 4px}
+.wave i{width:4px;height:6px;border-radius:2px;background:var(--teal)}
+.wave.on i{animation:wv 1s ease-in-out infinite}
+@keyframes wv{0%,100%{height:6px}50%{height:26px}}
+.status{min-height:3.4em;padding:10px 14px;border-radius:12px;color:var(--ink-2);font-size:.95rem;margin:6px 0 14px}
+.status.err,.status.warn{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);text-align:left}
+.status.live{color:var(--teal-ink);font-weight:700}
+.heard{margin:0 0 14px;text-align:left;border:1px dashed var(--line);border-radius:12px;padding:10px 14px;font-size:.95rem}
+.heard small{display:block;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
+.stage-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.convo{display:flex;flex-direction:column;gap:18px}
+.progress{display:flex;align-items:center;gap:14px;font-weight:700;font-size:.92rem;color:var(--ink-2)}
+.prog-bar{flex:1;height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.prog-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:99px;transition:width .35s}
+.dots{display:flex;gap:6px}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--teal)}
+.bubble{background:var(--chip-bg);border-radius:18px 18px 18px 4px;padding:16px 18px}
+.bubble b{display:block;font:700 1.2rem/1.35 var(--f-display)}
+.bubble .sub-en{display:block;margin-top:6px;font-size:.9rem;color:var(--ink-2)}
+.bubble .who{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--chip-ink);font-weight:700;display:block;margin-bottom:6px}
+label.lbl{display:block;font-weight:700;margin-bottom:8px;font-size:.92rem}
+.field{width:100%;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:1.08rem}
+textarea.field{resize:vertical;min-height:92px}
+.field:focus{border-color:var(--blue);outline:none;box-shadow:0 0 0 3px rgba(20,121,189,.2)}
+.hint{font-size:.85rem;color:var(--ink-2);margin-top:8px}
+.choices{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.choice{display:flex;gap:12px;align-items:center;text-align:left;padding:14px 16px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface);font-weight:600;min-height:56px}
+.choice .dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center;color:#fff}
+.choice[aria-checked="true"]{border-color:var(--blue);background:var(--chip-bg)}
+.choice[aria-checked="true"] .dot{background:var(--blue);border-color:var(--blue)}
+.nav-row{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.examples{margin-top:22px}
+.examples h3{font-size:1.05rem;margin-bottom:4px}
+.ex-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
+.ex-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--bg)}
+.ex-card .q{font-weight:700}
+.ex-card .a{margin-top:8px;padding:8px 12px;background:var(--chip-bg);border-radius:12px 12px 4px 12px;color:var(--ink)}
+.ex-card small{display:block;color:var(--ink-2);margin-top:6px}
+
+/* dashboard */
+.dash-head{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between;align-items:flex-end;padding-block:28px 18px}
+.dash-head h1{font-size:clamp(2rem,4.2vw,3rem);font-weight:800}
+.hi-sub{font-family:var(--f-display);color:var(--ink-2);font-size:1.15rem;margin-top:6px}
+.dash-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.notice{display:flex;gap:12px;align-items:flex-start;background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);border-radius:14px;padding:12px 16px;font-size:.93rem;margin-bottom:22px}
+.notice svg{flex:none;margin-top:2px}
+.dash-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:24px;align-items:start;padding-bottom:56px}
+.profile{position:sticky;top:88px}
+.profile .tag{margin-top:14px}
+.prof-list{margin:16px 0 18px;display:grid;gap:14px}
+.prof-list dt{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--ink-2)}
+.prof-list dd{margin:4px 0 0;font-weight:600}
+.prof-list .chips{margin-top:2px}
+.prof-list .chip{font-size:.8rem;padding:3px 10px}
+.stack{display:grid;gap:24px;min-width:0}
+.block-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-end;margin-bottom:14px}
+.block-head p{color:var(--ink-2);font-size:.95rem;margin-top:6px;max-width:60ch}
+.path-card{display:grid;gap:14px}
+.path-top{display:flex;gap:14px;align-items:flex-start}
+.path-top .grow{flex:1;min-width:0}
+.path-top h3{margin:0 0 2px}
+.rank{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--teal-ink)}
+.path-meta{display:flex;flex-wrap:wrap;gap:8px}
+.path-card .fit{color:var(--ink)}
+.path-actions{display:flex;flex-wrap:wrap;gap:10px}
+.why{border-top:1px dashed var(--line);padding-top:14px;display:grid;gap:12px}
+.factor{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
+.factor b{font-size:.95rem}
+.factor span.pts{font-weight:700;font-variant-numeric:tabular-nums;color:var(--teal-ink)}
+.factor span.pts.neg{color:var(--bad)}
+.factor p{grid-column:1/-1;font-size:.88rem;color:var(--ink-2)}
+.factor .bar{grid-column:1/-1;height:6px}
+.why .total{font-size:.88rem;color:var(--ink-2);background:var(--bg);border-radius:10px;padding:10px 12px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tabs button{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 16px;font-weight:700;min-height:40px}
+.tabs button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.timeline{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
+.stage-card{position:relative;border:1px solid var(--line);border-radius:16px;padding:18px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.stage-card.done{border-color:var(--teal);background:rgba(24,169,153,.1)}
+.stage-card .k{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--teal-ink)}
+.stage-card h4{font-size:1.1rem}
+.stage-card p{color:var(--ink-2);font-size:.93rem;flex:1}
+.stage-card .wk{font-weight:700;font-size:.85rem}
+.road-progress{display:flex;align-items:center;gap:12px;margin-top:16px;font-weight:700;font-size:.9rem;color:var(--ink-2)}
+.filters{display:flex;flex-wrap:wrap;gap:8px}
+.opp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.opp{display:flex;flex-direction:column;gap:12px}
+.opp.far{border-style:dashed;background:var(--bg)}
+.opp-top{display:flex;gap:8px;flex-wrap:wrap}
+.opp h3{margin:0;font-size:1.1rem}
+.opp .org{font-size:.9rem;color:var(--ink-2);margin-top:2px}
+.opp-facts{display:grid;gap:6px;font-size:.92rem}
+.opp-facts div{display:flex;gap:8px;align-items:center}
+.opp-facts svg{color:var(--ink-2);flex:none}
+.opp-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;flex-wrap:wrap}
+.star[aria-pressed="true"]{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn-ink)}
+.empty{padding:28px;text-align:center;border:1.5px dashed var(--line);border-radius:16px;color:var(--ink-2)}
+
+/* overlay + toast */
+.overlay{position:fixed;inset:0;background:rgba(6,20,36,.62);display:grid;place-items:center;z-index:100;padding:16px}
+.modal{background:var(--surface);color:var(--ink);border-radius:18px;max-width:720px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);border:1px solid var(--line)}
+.modal-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.modal pre{margin:0;padding:16px 20px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:.85rem/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;flex:1;min-height:0}
+.modal-foot{display:flex;flex-wrap:wrap;gap:10px;padding:14px 20px;border-top:1px solid var(--line)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#0B2442;color:#fff;padding:12px 18px;border-radius:12px;box-shadow:var(--shadow-lg);z-index:120;max-width:calc(100vw - 32px);font-weight:600;font-size:.95rem;animation:pop .25s ease-out both}
+@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}
+
+@media (max-width:980px){
+  .hero-grid{grid-template-columns:minmax(0,1fr)}
+  .assess-grid{grid-template-columns:minmax(0,1fr)}
+  .dash-grid{grid-template-columns:minmax(0,1fr)}
+  .profile{position:static}
+  .grid-3{grid-template-columns:minmax(0,1fr)}
+  .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .step:nth-child(2)::after{display:none}
+  .ex-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:820px){
+  .nav-links{display:none}
+  .menu-btn{display:inline-flex}
+  .nav-panel.open{display:block}
+  .timeline,.opp-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:560px){
+  .ribbon .hide-sm{display:none}
+  .nav-cta{display:none}
+  .menu-btn{margin-left:auto}
+  .steps{grid-template-columns:minmax(0,1fr)}
+  .step::after{display:none!important}
+  .voice-chip{left:8px;right:8px}
+  .seg button{padding:10px 10px}
+  .logo-text{font-size:1.25rem}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script>
+const { useState, useEffect, useRef, useMemo } = React;
+const ICONS = {
+  mic: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), /* @__PURE__ */ React.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), /* @__PURE__ */ React.createElement("path", { d: "M12 19v3" })),
+  pin: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "10", r: "3" })),
+  arrowR: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M5 12h14" }), /* @__PURE__ */ React.createElement("path", { d: "m12 5 7 7-7 7" })),
+  arrowL: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "m12 19-7-7 7-7" }), /* @__PURE__ */ React.createElement("path", { d: "M19 12H5" })),
+  check: /* @__PURE__ */ React.createElement("path", { d: "M20 6 9 17l-5-5" }),
+  globe: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /* @__PURE__ */ React.createElement("path", { d: "M2 12h20" }), /* @__PURE__ */ React.createElement("path", { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" })),
+  briefcase: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("rect", { width: "20", height: "14", x: "2", y: "7", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" })),
+  cap: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M22 10 12 5 2 10l10 5 10-5Z" }), /* @__PURE__ */ React.createElement("path", { d: "M6 12v5c3 3 9 3 12 0v-5" })),
+  download: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }), /* @__PURE__ */ React.createElement("path", { d: "m7 10 5 5 5-5" }), /* @__PURE__ */ React.createElement("path", { d: "M12 15V3" })),
+  chev: /* @__PURE__ */ React.createElement("path", { d: "m6 9 6 6 6-6" }),
+  bulb: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" }), /* @__PURE__ */ React.createElement("path", { d: "M9 18h6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 22h4" })),
+  sun: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "4" }), /* @__PURE__ */ React.createElement("path", { d: "M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" })),
+  scissors: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "6", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M8.1 8.1 12 12" }), /* @__PURE__ */ React.createElement("path", { d: "M20 4 8.1 15.9" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "18", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M14.8 14.8 20 20" })),
+  store: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" }), /* @__PURE__ */ React.createElement("path", { d: "M3 6h18" }), /* @__PURE__ */ React.createElement("path", { d: "M16 10a4 4 0 0 1-8 0" })),
+  monitor: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("rect", { width: "20", height: "14", x: "2", y: "3", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M8 21h8M12 17v4" })),
+  user: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "4" })),
+  stop: /* @__PURE__ */ React.createElement("rect", { x: "6", y: "6", width: "12", height: "12", rx: "2" }),
+  keyboard: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("rect", { width: "20", height: "14", x: "2", y: "5", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M6 9h.01M10 9h.01M14 9h.01M18 9h.01M7 13h10" })),
+  edit: /* @__PURE__ */ React.createElement("path", { d: "M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
+  clock: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /* @__PURE__ */ React.createElement("path", { d: "M12 6v6l4 2" })),
+  rupee: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M6 3h12M6 8h12M6 13l8.5 8M6 13h3" }), /* @__PURE__ */ React.createElement("path", { d: "M9 13c6.7 0 6.7-10 0-10" })),
+  layers: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "m12 2-10 5 10 5 10-5-10-5Z" }), /* @__PURE__ */ React.createElement("path", { d: "m2 17 10 5 10-5" }), /* @__PURE__ */ React.createElement("path", { d: "m2 12 10 5 10-5" })),
+  info: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /* @__PURE__ */ React.createElement("path", { d: "M12 16v-4M12 8h.01" })),
+  menu: /* @__PURE__ */ React.createElement("path", { d: "M4 6h16M4 12h16M4 18h16" }),
+  x: /* @__PURE__ */ React.createElement("path", { d: "M18 6 6 18M6 6l12 12" }),
+  star: /* @__PURE__ */ React.createElement("path", { d: "m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.3-6.2 3.3L8 14.2 3 9.3l6.9-1L12 2Z" }),
+  copy: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("rect", { width: "14", height: "14", x: "8", y: "8", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" })),
+  target: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "6" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "2" })),
+  search: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("path", { d: "m21 21-4.3-4.3" })),
+  route: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "19", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "5", r: "3" }))
+};
+function Icon({ name, size = 20, sw = 2, style }) {
+  return /* @__PURE__ */ React.createElement(
+    "svg",
+    {
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: sw,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      "aria-hidden": "true",
+      style: { flex: "none", ...style }
+    },
+    ICONS[name]
+  );
+}
+function LogoMark({ size = 40 }) {
+  return /* @__PURE__ */ React.createElement("svg", { width: size, height: Math.round(size * 44 / 48), viewBox: "0 0 48 44", fill: "none", "aria-hidden": "true" }, /* @__PURE__ */ React.createElement("path", { d: "M19 41C19 41 6 28 6 18a13 13 0 0 1 26 0C32 28 19 41 19 41Z", fill: "#1479BD" }), /* @__PURE__ */ React.createElement("circle", { cx: "19", cy: "18", r: "8.5", fill: "#fff" }), /* @__PURE__ */ React.createElement("rect", { x: "17.1", y: "12.2", width: "3.8", height: "7.2", rx: "1.9", fill: "#163A63" }), /* @__PURE__ */ React.createElement("path", { d: "M14.9 17.6a4.1 4.1 0 0 0 8.2 0", stroke: "#163A63", strokeWidth: "1.3", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("path", { d: "M19 21.7v2", stroke: "#163A63", strokeWidth: "1.3", strokeLinecap: "round" }), /* @__PURE__ */ React.createElement("path", { d: "M30.5 12 40 8.5 43 21.5 36 32.5M43 21.5 31.5 24", stroke: "#18A999", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }), /* @__PURE__ */ React.createElement("circle", { cx: "40", cy: "8.5", r: "3", fill: "#18A999" }), /* @__PURE__ */ React.createElement("circle", { cx: "43", cy: "21.5", r: "2.6", fill: "#18A999" }), /* @__PURE__ */ React.createElement("circle", { cx: "36", cy: "32.5", r: "2.4", fill: "#18A999" }));
+}
+function Logo({ onClick, inverse }) {
+  return /* @__PURE__ */ React.createElement("button", { className: "logo" + (inverse ? " inverse" : ""), onClick, "aria-label": "JeevikaAI home" }, /* @__PURE__ */ React.createElement(LogoMark, null), /* @__PURE__ */ React.createElement("span", { className: "logo-text" }, "Jeevika", /* @__PURE__ */ React.createElement("b", null, "AI")));
+}
+const EDU = [
+  { v: "Below 8th class", hi: "\u0906\u0920\u0935\u0940\u0902 \u0938\u0947 \u0915\u092E", kw: ["below 8", "not studied", "\u0906\u0920\u0935\u0940\u0902 \u0938\u0947 \u0915\u092E", "\u092A\u0922\u093C\u093E\u0908 \u0928\u0939\u0940\u0902"] },
+  { v: "8th class pass", hi: "8\u0935\u0940\u0902 \u092A\u093E\u0938", kw: ["8th", "eighth", "\u0906\u0920\u0935\u0940\u0902", "8\u0935\u0940\u0902"] },
+  { v: "10th pass (Secondary)", hi: "10\u0935\u0940\u0902 \u092A\u093E\u0938", kw: ["10th", "tenth", "matric", "secondary", "\u0926\u0938\u0935\u0940\u0902", "10\u0935\u0940\u0902", "\u0926\u0938\u0935\u0940"] },
+  { v: "12th pass (Higher Secondary)", hi: "12\u0935\u0940\u0902 \u092A\u093E\u0938", kw: ["12th", "twelfth", "intermediate", "\u092C\u093E\u0930\u0939\u0935\u0940\u0902", "12\u0935\u0940\u0902"] },
+  { v: "Graduate", hi: "\u0938\u094D\u0928\u093E\u0924\u0915", kw: ["graduate", "graduation", "degree", "\u0938\u094D\u0928\u093E\u0924\u0915"] },
+  { v: "ITI / Diploma", hi: "ITI / \u0921\u093F\u092A\u094D\u0932\u094B\u092E\u093E", kw: ["iti", "diploma", "\u0921\u093F\u092A\u094D\u0932\u094B\u092E\u093E"] }
+];
+const WORK = [
+  { v: "Job", hi: "\u0928\u094C\u0915\u0930\u0940", kw: ["job", "naukri", "\u0928\u094C\u0915\u0930\u0940"] },
+  { v: "Self-employment", hi: "\u0938\u094D\u0935\u0930\u094B\u091C\u0917\u093E\u0930", kw: ["self", "own", "business", "apna", "khud", "\u0905\u092A\u0928\u093E", "\u0938\u094D\u0935\u0930\u094B\u091C\u0917\u093E\u0930"] },
+  { v: "Either", hi: "\u0915\u094B\u0908 \u092D\u0940", kw: ["either", "any", "both", "dono", "\u0915\u094B\u0908 \u092D\u0940", "\u0926\u094B\u0928\u094B\u0902"] }
+];
+const MOB = [
+  { v: "Nearby only (within ~10 km)", hi: "\u092A\u093E\u0938 \u092E\u0947\u0902 \u0939\u0940 (\u0932\u0917\u092D\u0917 10 \u0915\u093F\u092E\u0940 \u0924\u0915)", kw: ["near", "close", "paas", "local", "village", "\u092A\u093E\u0938", "\u0928\u091C\u0926\u0940\u0915", "\u0917\u093E\u0901\u0935", "\u0917\u093E\u0902\u0935"] },
+  { v: "Within my district", hi: "\u092E\u0947\u0930\u0947 \u091C\u093F\u0932\u0947 \u092E\u0947\u0902", kw: ["district", "zila", "city", "\u091C\u093F\u0932\u093E", "\u091C\u093F\u0932\u0947", "\u0936\u0939\u0930"] },
+  { v: "Anywhere in the state", hi: "\u0930\u093E\u091C\u094D\u092F \u092E\u0947\u0902 \u0915\u0939\u0940\u0902 \u092D\u0940", kw: ["state", "anywhere", "kahin bhi", "far", "\u0915\u0939\u0940\u0902 \u092D\u0940", "\u0930\u093E\u091C\u094D\u092F"] }
+];
+const SKILL_CHIPS = [
+  { en: "Typing", hi: "\u091F\u093E\u0907\u092A\u093F\u0902\u0917" },
+  { en: "Stitching", hi: "\u0938\u093F\u0932\u093E\u0908" },
+  { en: "Cooking", hi: "\u0916\u093E\u0928\u093E \u092C\u0928\u093E\u0928\u093E" },
+  { en: "Using a phone", hi: "\u092E\u094B\u092C\u093E\u0907\u0932 \u091A\u0932\u093E\u0928\u093E" },
+  { en: "Basic communication", hi: "\u092C\u093E\u0924\u091A\u0940\u0924 \u0915\u0930\u0928\u093E" },
+  { en: "Accounts and billing", hi: "\u0939\u093F\u0938\u093E\u092C-\u0915\u093F\u0924\u093E\u092C" }
+];
+const INTEREST_CHIPS = [
+  { en: "Digital services", hi: "\u0921\u093F\u091C\u093F\u091F\u0932 \u0938\u0947\u0935\u093E\u090F\u0901" },
+  { en: "Computers", hi: "\u0915\u0902\u092A\u094D\u092F\u0942\u091F\u0930" },
+  { en: "Shop and sales", hi: "\u0926\u0941\u0915\u093E\u0928 \u0914\u0930 \u092C\u093F\u0915\u094D\u0930\u0940" },
+  { en: "Solar energy", hi: "\u0938\u094B\u0932\u0930 \u090A\u0930\u094D\u091C\u093E" },
+  { en: "Tailoring", hi: "\u0938\u093F\u0932\u093E\u0908-\u0915\u0922\u093C\u093E\u0908" }
+];
+const DEMO = {
+  name: "Sunita Devi",
+  education: "10th pass (Secondary)",
+  skills: "Basic communication, Hindi typing, mobile phone use",
+  interests: "Digital services, computers, mobile apps",
+  occupation: "Homemaker, helps at a family shop",
+  location: "Maharajganj, Uttar Pradesh",
+  workType: "Job",
+  mobility: "Nearby only (within ~10 km)"
+};
+const FIELDS = Object.keys(DEMO);
+const isDemoProfile = (p) => FIELDS.every((k) => (p[k] || "") === DEMO[k]);
+const STEPS = [
+  {
+    key: "name",
+    type: "text",
+    label: "Name",
+    q: { en: "What is your name?", hi: "\u0906\u092A\u0915\u093E \u0928\u093E\u092E \u0915\u094D\u092F\u093E \u0939\u0948?", hin: "Aapka naam kya hai?" },
+    ph: { en: "For example: Sunita Devi", hi: "\u091C\u0948\u0938\u0947: \u0938\u0941\u0928\u0940\u0924\u093E \u0926\u0947\u0935\u0940", hin: "Jaise: Sunita Devi" }
+  },
+  {
+    key: "education",
+    type: "choice",
+    options: EDU,
+    label: "Education",
+    q: { en: "How far did you study?", hi: "\u0906\u092A\u0928\u0947 \u0915\u0939\u093E\u0901 \u0924\u0915 \u092A\u0922\u093C\u093E\u0908 \u0915\u0940 \u0939\u0948?", hin: "Aapne kahan tak padhai ki hai?" }
+  },
+  {
+    key: "skills",
+    type: "area",
+    chips: SKILL_CHIPS,
+    label: "Existing skills",
+    q: { en: "What can you already do? For example typing, stitching, cooking or using a phone.", hi: "\u0906\u092A \u092A\u0939\u0932\u0947 \u0938\u0947 \u0915\u094D\u092F\u093E-\u0915\u094D\u092F\u093E \u0915\u0930 \u0938\u0915\u0924\u0947 \u0939\u0948\u0902? \u091C\u0948\u0938\u0947 \u091F\u093E\u0907\u092A\u093F\u0902\u0917, \u0938\u093F\u0932\u093E\u0908, \u0916\u093E\u0928\u093E \u092C\u0928\u093E\u0928\u093E \u092F\u093E \u092E\u094B\u092C\u093E\u0907\u0932 \u091A\u0932\u093E\u0928\u093E\u0964", hin: "Aap pehle se kya-kya kar sakte hain? Jaise typing, silai, cooking ya mobile chalana." },
+    ph: { en: "Type or tap the skills you have", hi: "\u0905\u092A\u0928\u0940 \u092F\u094B\u0917\u094D\u092F\u0924\u093E\u090F\u0901 \u0932\u093F\u0916\u0947\u0902 \u092F\u093E \u091A\u0941\u0928\u0947\u0902", hin: "Apni skills likhein ya chunein" }
+  },
+  {
+    key: "interests",
+    type: "area",
+    chips: INTEREST_CHIPS,
+    label: "Interests",
+    q: { en: "What kind of work interests you?", hi: "\u0906\u092A\u0915\u094B \u0915\u093F\u0938 \u0924\u0930\u0939 \u0915\u0947 \u0915\u093E\u092E \u092E\u0947\u0902 \u0930\u0941\u091A\u093F \u0939\u0948?", hin: "Aapko kis tarah ke kaam mein ruchi hai?" },
+    ph: { en: "Type or tap what interests you", hi: "\u0905\u092A\u0928\u0940 \u0930\u0941\u091A\u093F \u0932\u093F\u0916\u0947\u0902 \u092F\u093E \u091A\u0941\u0928\u0947\u0902", hin: "Apni ruchi likhein ya chunein" }
+  },
+  {
+    key: "occupation",
+    type: "text",
+    optional: true,
+    label: "Current occupation",
+    q: { en: "What do you do at the moment? (optional)", hi: "\u0905\u092D\u0940 \u0906\u092A \u0915\u094D\u092F\u093E \u0915\u093E\u092E \u0915\u0930\u0924\u0947 \u0939\u0948\u0902? (\u0935\u0948\u0915\u0932\u094D\u092A\u093F\u0915)", hin: "Abhi aap kya kaam karte hain? (optional)" },
+    ph: { en: "For example: homemaker, farm work, student", hi: "\u091C\u0948\u0938\u0947: \u0917\u0943\u0939\u093F\u0923\u0940, \u0916\u0947\u0924\u0940, \u0935\u093F\u0926\u094D\u092F\u093E\u0930\u094D\u0925\u0940", hin: "Jaise: homemaker, kheti, student" }
+  },
+  {
+    key: "location",
+    type: "text",
+    label: "District or location",
+    q: { en: "Which district or town do you live in?", hi: "\u0906\u092A \u0915\u093F\u0938 \u091C\u093F\u0932\u0947 \u092F\u093E \u0915\u0938\u094D\u092C\u0947 \u092E\u0947\u0902 \u0930\u0939\u0924\u0947 \u0939\u0948\u0902?", hin: "Aap kis zile ya kasbe mein rehte hain?" },
+    ph: { en: "For example: Maharajganj, Uttar Pradesh", hi: "\u091C\u0948\u0938\u0947: \u092E\u0939\u0930\u093E\u091C\u0917\u0902\u091C, \u0909\u0924\u094D\u0924\u0930 \u092A\u094D\u0930\u0926\u0947\u0936", hin: "Jaise: Maharajganj, Uttar Pradesh" }
+  },
+  {
+    key: "workType",
+    type: "choice",
+    options: WORK,
+    label: "Preferred work type",
+    q: { en: "Would you like a job or to start your own work?", hi: "\u0906\u092A \u0928\u094C\u0915\u0930\u0940 \u0915\u0930\u0928\u093E \u091A\u093E\u0939\u0924\u0947 \u0939\u0948\u0902 \u092F\u093E \u0905\u092A\u0928\u093E \u0915\u093E\u092E \u0936\u0941\u0930\u0942 \u0915\u0930\u0928\u093E \u091A\u093E\u0939\u0924\u0947 \u0939\u0948\u0902?", hin: "Aap naukri karna chahte hain ya apna kaam shuru karna?" }
+  },
+  {
+    key: "mobility",
+    type: "choice",
+    options: MOB,
+    label: "Mobility preference",
+    q: { en: "How far can you travel for work?", hi: "\u0915\u093E\u092E \u0915\u0947 \u0932\u093F\u090F \u0906\u092A \u0915\u093F\u0924\u0928\u0940 \u0926\u0942\u0930 \u091C\u093E \u0938\u0915\u0924\u0947 \u0939\u0948\u0902?", hin: "Kaam ke liye aap kitni door ja sakte hain?" }
+  }
+];
+const LANGS = [
+  { k: "hi", label: "\u0939\u093F\u0928\u094D\u0926\u0940", sub: "Hindi", code: "hi-IN" },
+  { k: "en", label: "English", sub: "English", code: "en-IN" },
+  { k: "hin", label: "Hinglish", sub: "Hindi + English", code: "en-IN" }
+];
+const EXAMPLES = {
+  hi: [
+    { q: "\u0906\u092A\u0915\u093E \u0928\u093E\u092E \u0915\u094D\u092F\u093E \u0939\u0948?", a: "\u092E\u0947\u0930\u093E \u0928\u093E\u092E \u0938\u0941\u0928\u0940\u0924\u093E \u0926\u0947\u0935\u0940 \u0939\u0948\u0964", en: "What is your name? / My name is Sunita Devi." },
+    { q: "\u0906\u092A\u0915\u094B \u0915\u093F\u0938 \u0924\u0930\u0939 \u0915\u0947 \u0915\u093E\u092E \u092E\u0947\u0902 \u0930\u0941\u091A\u093F \u0939\u0948?", a: "\u092E\u0941\u091D\u0947 \u0915\u0902\u092A\u094D\u092F\u0942\u091F\u0930 \u0914\u0930 \u092E\u094B\u092C\u093E\u0907\u0932 \u092A\u0930 \u0915\u093E\u092E \u0938\u0940\u0916\u0928\u093E \u0939\u0948\u0964", en: "What work interests you? / I want to learn work on computers and mobiles." },
+    { q: "\u0915\u093E\u092E \u0915\u0947 \u0932\u093F\u090F \u0906\u092A \u0915\u093F\u0924\u0928\u0940 \u0926\u0942\u0930 \u091C\u093E \u0938\u0915\u0924\u0947 \u0939\u0948\u0902?", a: "\u092E\u0948\u0902 \u0905\u092A\u0928\u0947 \u0917\u093E\u0901\u0935 \u0915\u0947 \u092A\u093E\u0938 \u0939\u0940 \u0915\u093E\u092E \u0915\u0930\u0928\u093E \u091A\u093E\u0939\u0924\u0940 \u0939\u0942\u0901\u0964", en: "How far can you travel? / I want to work near my village." }
+  ],
+  hin: [
+    { q: "Aapka naam kya hai?", a: "Mera naam Sunita Devi hai.", en: "What is your name? / My name is Sunita Devi." },
+    { q: "Aapko kis tarah ke kaam mein ruchi hai?", a: "Mujhe computer aur mobile ka kaam seekhna hai.", en: "What work interests you? / I want to learn computer and mobile work." },
+    { q: "Kaam ke liye aap kitni door ja sakte hain?", a: "Main gaon ke paas hi kaam karna chahti hoon.", en: "How far can you travel? / I want to work near my village." }
+  ]
+};
+const PATHWAYS = [
+  {
+    id: "digital",
+    name: "Digital Services",
+    hi: "\u0921\u093F\u091C\u093F\u091F\u0932 \u0938\u0947\u0935\u093E\u090F\u0901",
+    role: "Digital Service Assistant or Data Entry Operator",
+    icon: "monitor",
+    duration: "3 months (about 240 hours)",
+    nsqf: 3,
+    minEdu: 2,
+    workTypes: ["job", "self"],
+    reach: "local",
+    demand: 10,
+    demandNote: "Towns and villages need more help with online forms, bill payment and e-services",
+    interestTags: ["digital", "computer", "mobile", "online", "internet", "typing", "data entry", "\u0921\u093F\u091C\u093F\u091F\u0932", "\u0915\u0902\u092A\u094D\u092F\u0942\u091F\u0930", "\u092E\u094B\u092C\u093E\u0907\u0932", "\u0907\u0902\u091F\u0930\u0928\u0947\u091F", "\u0911\u0928\u0932\u093E\u0907\u0928", "\u091F\u093E\u0907\u092A\u093F\u0902\u0917"],
+    skillTags: ["typing", "computer", "mobile", "phone", "internet", "communication", "excel", "\u091F\u093E\u0907\u092A\u093F\u0902\u0917", "\u0915\u0902\u092A\u094D\u092F\u0942\u091F\u0930", "\u092E\u094B\u092C\u093E\u0907\u0932", "\u092C\u093E\u0924\u091A\u0940\u0924"],
+    stages: [
+      ["Computer and phone basics", "Learn to use a computer and smartphone with confidence. Practise typing in Hindi and English and stay safe online.", "Weeks 1 to 4"],
+      ["Online services practice", "Practise online forms, bill payment, digital payments and simple spreadsheets with a mentor.", "Weeks 5 to 9"],
+      ["Find your first role", "Apply for assistant roles at service counters, or plan a small digital seva counter of your own.", "Weeks 10 to 12"]
+    ]
+  },
+  {
+    id: "retail",
+    name: "Retail Operations",
+    hi: "\u0930\u093F\u091F\u0947\u0932 \u0938\u0902\u091A\u093E\u0932\u0928",
+    role: "Retail Sales Associate",
+    icon: "store",
+    duration: "2 months (about 160 hours)",
+    nsqf: 3,
+    minEdu: 1,
+    workTypes: ["job", "self"],
+    reach: "local",
+    demand: 6,
+    demandNote: "Local markets and stores keep hiring counter and billing staff",
+    interestTags: ["retail", "shop", "sales", "selling", "customer", "market", "store", "dukaan", "\u0926\u0941\u0915\u093E\u0928", "\u092C\u093F\u0915\u094D\u0930\u0940", "\u0917\u094D\u0930\u093E\u0939\u0915"],
+    skillTags: ["communication", "customer", "sales", "shop", "store", "billing", "accounts", "selling", "\u0939\u093F\u0938\u093E\u092C", "\u0926\u0941\u0915\u093E\u0928", "\u092C\u093E\u0924\u091A\u0940\u0924"],
+    stages: [
+      ["Customer service basics", "Learn greeting, listening and product knowledge. Practise explaining prices and handling common questions.", "Weeks 1 to 3"],
+      ["Counter and stock skills", "Practise billing apps, stock counting, shelf display and handling returns politely.", "Weeks 4 to 6"],
+      ["Find your first role", "Apply for shop assistant or billing roles nearby, or run a small store counter.", "Weeks 7 to 8"]
+    ]
+  },
+  {
+    id: "solar",
+    name: "Solar PV Installation",
+    hi: "\u0938\u094B\u0932\u0930 \u092A\u0948\u0928\u0932 \u0907\u0902\u0938\u094D\u091F\u0949\u0932\u0947\u0936\u0928",
+    role: "Solar PV Installer Helper",
+    icon: "sun",
+    duration: "3 to 4 months (about 300 hours)",
+    nsqf: 4,
+    minEdu: 2,
+    workTypes: ["job"],
+    reach: "regional",
+    demand: 12,
+    demandNote: "Rooftop solar installations are growing across the region",
+    interestTags: ["solar", "electric", "wiring", "energy", "repair", "\u0938\u094B\u0932\u0930", "\u092C\u093F\u091C\u0932\u0940", "\u090A\u0930\u094D\u091C\u093E"],
+    skillTags: ["wiring", "electric", "repair", "technical", "tools", "\u0938\u094B\u0932\u0930", "\u092C\u093F\u091C\u0932\u0940"],
+    stages: [
+      ["Safety and electrical basics", "Learn site safety, working at height and basic electrical ideas such as current, voltage and wiring.", "Weeks 1 to 5"],
+      ["Panel mounting and wiring", "Practise mounting panels, cable routing and inverter connections under supervision.", "Weeks 6 to 13"],
+      ["Join an installation crew", "Start as a helper with a regional installer and grow towards a technician role.", "Weeks 14 to 16"]
+    ]
+  },
+  {
+    id: "tailoring",
+    name: "Tailoring and Garment Making",
+    hi: "\u0938\u093F\u0932\u093E\u0908 \u0914\u0930 \u092A\u0930\u093F\u0927\u093E\u0928 \u0928\u093F\u0930\u094D\u092E\u093E\u0923",
+    role: "Sewing Machine Operator or Home Tailor",
+    icon: "scissors",
+    duration: "3 months (about 240 hours)",
+    nsqf: 3,
+    minEdu: 0,
+    workTypes: ["job", "self"],
+    reach: "local",
+    demand: 2,
+    demandNote: "Steady local demand for blouses, uniforms and alterations",
+    interestTags: ["tailor", "stitch", "sewing", "silai", "garment", "embroidery", "\u0938\u093F\u0932\u093E\u0908", "\u0915\u0922\u093C\u093E\u0908", "\u0926\u0930\u094D\u091C\u0940"],
+    skillTags: ["stitch", "sewing", "tailor", "silai", "embroidery", "\u0938\u093F\u0932\u093E\u0908", "\u0915\u0922\u093C\u093E\u0908"],
+    stages: [
+      ["Machine and measurement basics", "Learn machine handling, taking measurements and basic stitches.", "Weeks 1 to 4"],
+      ["Cutting and finishing", "Practise cutting, blouse and uniform patterns, and neat finishing.", "Weeks 5 to 9"],
+      ["Take your first orders", "Start home-based orders or work as a helper at a local tailoring shop.", "Weeks 10 to 12"]
+    ]
+  }
+];
+const STAGE_TITLES = ["Start Learning", "Build Skills", "Explore Opportunities"];
+const JOBS = [
+  { id: "j1", title: "Digital Service Assistant", org: "Community service counter", type: "Job", loc: "Maharajganj town", km: 4, pay: "\u20B98,000 to \u20B912,000 per month", path: "digital" },
+  { id: "j2", title: "Data Entry Operator (part-time)", org: "Local coaching centre", type: "Job", loc: "Maharajganj town", km: 6, pay: "\u20B96,000 to \u20B99,000 per month", path: "digital" },
+  { id: "j3", title: "Start a Digital Seva Counter", org: "Self-employment idea", type: "Self-employment", loc: "Your own village or ward", km: 0, pay: "\u20B98,000 to \u20B918,000 per month (varies)", path: "digital" },
+  { id: "j4", title: "Retail Sales Associate", org: "General store", type: "Job", loc: "Maharajganj market", km: 3, pay: "\u20B97,000 to \u20B910,000 per month", path: "retail" },
+  { id: "j5", title: "Billing Counter Executive", org: "Supermarket outlet", type: "Job", loc: "Gorakhpur city", km: 55, pay: "\u20B910,000 to \u20B914,000 per month", path: "retail" },
+  { id: "j6", title: "Solar Installation Helper", org: "Regional solar installer", type: "Job", loc: "Across Maharajganj district", km: 35, pay: "\u20B99,000 to \u20B914,000 per month", path: "solar" },
+  { id: "j7", title: "Home Tailoring Orders", org: "Self-employment idea", type: "Self-employment", loc: "Your own home", km: 0, pay: "\u20B95,000 to \u20B912,000 per month (varies)", path: "tailoring" }
+];
+const mobKey = (v) => (v || "").includes("Nearby") ? "near" : (v || "").includes("district") ? "district" : "state";
+const REACH_KM = { near: 10, district: 40, state: Infinity };
+const listOf = (a) => a.join(", ");
+function evaluate(p, prof) {
+  const interests = (prof.interests || "").toLowerCase();
+  const skillsTxt = ((prof.skills || "") + " " + (prof.occupation || "")).toLowerCase();
+  const iHits = p.interestTags.filter((t) => interests.includes(t));
+  const sHits = p.skillTags.filter((t) => skillsTxt.includes(t));
+  const f = [{ k: "base", label: "Starting point", pts: 30, note: "Every pathway starts from the same base score." }];
+  if (iHits.length) {
+    f.push({
+      k: "interest",
+      label: "Your interests",
+      pts: 12 * Math.min(iHits.length, 3),
+      short: "matches your interest in " + listOf(iHits.slice(0, 2)),
+      note: "You mentioned " + listOf(iHits) + ", which this pathway builds on."
+    });
+  } else f.push({ k: "interest", label: "Your interests", pts: 0, note: "No direct match with the interests you shared." });
+  if (sHits.length) {
+    f.push({
+      k: "skills",
+      label: "Skills you already have",
+      pts: 6 * Math.min(sHits.length, 3),
+      short: "builds on your skills in " + listOf(sHits.slice(0, 2)),
+      note: "Your profile includes " + listOf(sHits) + ", which help in this pathway."
+    });
+  } else f.push({ k: "skills", label: "Skills you already have", pts: 0, note: "None of your listed skills overlap yet. Training would start from the basics." });
+  const ei = Math.max(0, EDU.findIndex((e) => e.v === prof.education));
+  if (ei >= p.minEdu) f.push({ k: "edu", label: "Education", pts: 8, short: "suits your education level", note: "Your education (" + EDU[ei].v + ") meets the usual entry level." });
+  else f.push({ k: "edu", label: "Education", pts: -6, note: "This pathway usually expects " + EDU[p.minEdu].v + " or above." });
+  const pref = prof.workType, has = (k) => p.workTypes.includes(k);
+  if (pref === "Job") f.push(has("job") ? { k: "work", label: "Work type", pts: 8, short: "leads to jobs", note: "You prefer a job and this pathway leads to salaried roles." } : { k: "work", label: "Work type", pts: 0, note: "This pathway mostly leads to self-employment." });
+  else if (pref === "Self-employment") f.push(has("self") ? { k: "work", label: "Work type", pts: 8, short: "can lead to your own work", note: "You prefer self-employment and this pathway supports it." } : { k: "work", label: "Work type", pts: 0, note: "This pathway mostly leads to salaried roles." });
+  else f.push({
+    k: "work",
+    label: "Work type",
+    pts: has("job") && has("self") ? 8 : 5,
+    short: has("job") && has("self") ? "offers both jobs and self-employment" : null,
+    note: has("job") && has("self") ? "You are open to either, and this pathway offers both." : "You are open to either, and this pathway offers one of them."
+  });
+  const mk = mobKey(prof.mobility);
+  const mt = { near: { local: 8, regional: 0 }, district: { local: 6, regional: 4 }, state: { local: 4, regional: 8 } };
+  const mpts = mt[mk][p.reach];
+  const mnote = p.reach === "local" ? mk === "near" ? "Most work for this pathway is available close to home, which matches your nearby preference." : "Work for this pathway is available locally, and you can also travel further." : mk === "near" ? "Installation work can involve travel beyond your nearby preference." : "This pathway involves travel, which fits your wider travel range.";
+  f.push({ k: "mobility", label: "Travel range", pts: mpts, short: mpts >= 8 ? p.reach === "local" ? "can be done close to home" : "fits your travel range" : null, note: mnote });
+  f.push({ k: "demand", label: "Local demand signal", pts: p.demand, note: p.demandNote + ". This is an illustrative signal, not live data." });
+  const raw = f.reduce((s, x) => s + x.pts, 0);
+  const score = Math.max(20, Math.min(98, raw));
+  const order = ["interest", "skills", "mobility", "work", "edu"];
+  const shorts = order.map((k) => f.find((x) => x.k === k)).filter((x) => x && x.pts > 0 && x.short).slice(0, 2).map((x) => x.short);
+  const fit = shorts.length ? "Fits because it " + shorts.join(" and ") + "." : "Shown as a general option for your profile.";
+  return { ...p, score, raw, factors: f, fit };
+}
+const rankPaths = (prof) => PATHWAYS.map((p) => evaluate(p, prof)).sort((a, b) => b.score - a.score);
+function rankJobs(prof, ranked) {
+  const sc = Object.fromEntries(ranked.map((p) => [p.id, p.score]));
+  const lim = REACH_KM[mobKey(prof.mobility)];
+  return JOBS.map((j) => ({ ...j, score: sc[j.path] || 0, inRange: j.km <= lim })).sort((a, b) => b.inRange - a.inRange || b.score - a.score || a.km - b.km);
+}
+const PREVIEW = rankPaths(DEMO);
+const PREVIEW_JOBS = rankJobs(DEMO, PREVIEW).slice(0, 2);
+const pathName = (id) => (PATHWAYS.find((p) => p.id === id) || {}).name || "";
+const splitList = (s) => (s || "").split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
+const slug = (s) => (s || "beneficiary").trim().replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "beneficiary";
+const kmLabel = (j) => j.km === 0 ? "At your location" : "About " + j.km + " km away";
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function buildSummary(profile, ranked, jobs, selId, shortlist) {
+  const L = [];
+  const sel = ranked.find((p) => p.id === selId) || ranked[0];
+  L.push("JEEVIKAAI LIVELIHOOD SUMMARY");
+  L.push("DEMO PROTOTYPE | Knight Coders");
+  L.push("Generated: " + (/* @__PURE__ */ new Date()).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
+  L.push("");
+  L.push("IMPORTANT: Recommendations, course details, NSQF levels and job listings in this");
+  L.push("summary are illustrative demo data. They are not verified live listings or");
+  L.push("official certifications." + (profile.isDemo ? " The beneficiary below is fictional sample data." : ""));
+  L.push("");
+  L.push("BENEFICIARY PROFILE");
+  L.push("Name: " + profile.name);
+  L.push("Location: " + profile.location);
+  L.push("Education: " + profile.education);
+  L.push("Existing skills: " + (profile.skills || "Not shared"));
+  L.push("Interests: " + (profile.interests || "Not shared"));
+  L.push("Current occupation: " + (profile.occupation || "Not shared"));
+  L.push("Preferred work type: " + profile.workType);
+  L.push("Mobility preference: " + profile.mobility);
+  L.push("");
+  L.push("TOP SKILL PATHWAYS (rule-based demo scoring, not a trained model)");
+  ranked.slice(0, 3).forEach((p, i) => {
+    L.push(i + 1 + ". " + p.name + " - fit score " + p.score + "/100");
+    L.push("   Role: " + p.role);
+    L.push("   Duration: " + p.duration);
+    L.push("   Sample NSQF level: " + p.nsqf);
+    L.push("   " + p.fit);
+    p.factors.filter((x) => x.k !== "base").forEach((x) => L.push("   - " + x.label + " (" + (x.pts > 0 ? "+" : "") + x.pts + "): " + x.note));
+    L.push("");
+  });
+  L.push("LEARNING ROADMAP: " + sel.name);
+  sel.stages.forEach((s, i) => L.push(i + 1 + ". " + STAGE_TITLES[i] + " (" + s[2] + "): " + s[0] + ". " + s[1]));
+  L.push("");
+  L.push("SAMPLE LOCAL OPPORTUNITIES (illustrative)");
+  jobs.forEach((j) => L.push("- " + j.title + " | " + j.org + " | " + j.type + " | " + j.loc + " | " + kmLabel(j) + " | " + j.pay + (j.inRange ? "" : " | Outside your nearby range") + (shortlist[j.id] ? " | SHORTLISTED" : "")));
+  L.push("");
+  L.push("Built by Team Knight Coders. Prototype for vocational discovery.");
+  return L.join("\n");
+}
+function Wave({ on, n = 9 }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "wave" + (on ? " on" : ""), "aria-hidden": "true" }, Array.from({ length: n }).map((_, i) => /* @__PURE__ */ React.createElement("i", { key: i, style: { animationDelay: i * 0.09 + "s", height: on ? void 0 : 6 + i * 5 % 4 * 3 + "px" } })));
+}
+function Ring({ value, size = 64 }) {
+  const r = 26, c = 2 * Math.PI * r;
+  return /* @__PURE__ */ React.createElement("svg", { width: size, height: size, viewBox: "0 0 64 64", role: "img", "aria-label": "Fit score " + value + " out of 100", style: { flex: "none" } }, /* @__PURE__ */ React.createElement("circle", { cx: "32", cy: "32", r, fill: "none", strokeWidth: "6", style: { stroke: "var(--line)" } }), /* @__PURE__ */ React.createElement(
+    "circle",
+    {
+      cx: "32",
+      cy: "32",
+      r,
+      fill: "none",
+      strokeWidth: "6",
+      strokeLinecap: "round",
+      strokeDasharray: c,
+      strokeDashoffset: c * (1 - value / 100),
+      transform: "rotate(-90 32 32)",
+      style: { stroke: "var(--teal)" }
+    }
+  ), /* @__PURE__ */ React.createElement("text", { x: "32", y: "38", textAnchor: "middle", fontSize: "18", fontWeight: "700", style: { fill: "var(--ink)", fontFamily: "var(--f-display)" } }, value));
+}
+function Nav({ route, go }) {
+  const [open, setOpen] = useState(false);
+  const act = (r, s) => {
+    setOpen(false);
+    go(r, s);
+  };
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "ribbon" }, /* @__PURE__ */ React.createElement("div", { className: "wrap" }, /* @__PURE__ */ React.createElement("span", { className: "badge" }, "DEMO PROTOTYPE | Knight Coders"), /* @__PURE__ */ React.createElement("span", { className: "hide-sm" }, "Fictional sample data. Not an official government service."))), /* @__PURE__ */ React.createElement("header", { className: "nav" }, /* @__PURE__ */ React.createElement("div", { className: "wrap nav-in" }, /* @__PURE__ */ React.createElement(Logo, { onClick: () => act("home") }), /* @__PURE__ */ React.createElement("nav", { className: "nav-links", "aria-label": "Main" }, /* @__PURE__ */ React.createElement("button", { "aria-current": route === "home" ? "page" : void 0, onClick: () => act("home") }, "Home"), /* @__PURE__ */ React.createElement("button", { onClick: () => act("home", "how") }, "How It Works"), /* @__PURE__ */ React.createElement("button", { "aria-current": route === "dashboard" ? "page" : void 0, onClick: () => act("dashboard", "opps") }, "Opportunities")), /* @__PURE__ */ React.createElement("button", { className: "btn btn-primary btn-sm nav-cta", onClick: () => act("assessment") }, "Start Assessment"), /* @__PURE__ */ React.createElement("button", { className: "menu-btn", "aria-label": open ? "Close menu" : "Open menu", "aria-expanded": open, onClick: () => setOpen(!open) }, /* @__PURE__ */ React.createElement(Icon, { name: open ? "x" : "menu" }))), /* @__PURE__ */ React.createElement("div", { className: "nav-panel" + (open ? " open" : "") }, /* @__PURE__ */ React.createElement("div", { className: "wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => act("home") }, "Home"), /* @__PURE__ */ React.createElement("button", { onClick: () => act("home", "how") }, "How It Works"), /* @__PURE__ */ React.createElement("button", { onClick: () => act("dashboard", "opps") }, "Opportunities"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-primary", style: { color: "#fff" }, onClick: () => act("assessment") }, "Start Assessment")))));
+}
+function Footer({ go }) {
+  return /* @__PURE__ */ React.createElement("footer", { className: "footer" }, /* @__PURE__ */ React.createElement("div", { className: "wrap" }, /* @__PURE__ */ React.createElement("div", { className: "footer-grid" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(Logo, { inverse: true, onClick: () => go("home") }), /* @__PURE__ */ React.createElement("p", null, "Voice-Based Livelihood & Skill Assistant. Helping people find skills, training and nearby work in their own language.")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "team" }, "Team Knight Coders"), /* @__PURE__ */ React.createElement("p", { style: { marginTop: 6 } }, "Voice-first Livelihood Assistant"))), /* @__PURE__ */ React.createElement("p", { className: "fine" }, "Disclaimer: JeevikaAI is a demo prototype. Profiles, skill recommendations, course details, NSQF levels and job listings are fictional or illustrative sample data. They are not verified live listings or official certifications, and nothing here is approved by or affiliated with any government body.")));
+}
+function Preview() {
+  return /* @__PURE__ */ React.createElement("div", { className: "preview-wrap" }, /* @__PURE__ */ React.createElement("div", { className: "voice-chip" }, /* @__PURE__ */ React.createElement("span", { className: "vc-icon" }, /* @__PURE__ */ React.createElement(Icon, { name: "mic", size: 16 })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "vc-label" }, "Sample voice input"), /* @__PURE__ */ React.createElement("div", { className: "vc-text", lang: "hi" }, "\u201C\u092E\u0941\u091D\u0947 \u0915\u0902\u092A\u094D\u092F\u0942\u091F\u0930 \u0938\u0940\u0916\u0928\u093E \u0939\u0948\u201D")), /* @__PURE__ */ React.createElement(Wave, { on: true, n: 5 })), /* @__PURE__ */ React.createElement("div", { className: "preview" }, /* @__PURE__ */ React.createElement("div", { className: "pv-head" }, /* @__PURE__ */ React.createElement("div", { className: "avatar" }, "S"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "pv-name" }, "Sunita Devi"), /* @__PURE__ */ React.createElement("div", { className: "pv-meta" }, /* @__PURE__ */ React.createElement(Icon, { name: "pin", size: 13 }), " Maharajganj, UP")), /* @__PURE__ */ React.createElement("span", { className: "tag tag-warn" }, "Fictional sample")), /* @__PURE__ */ React.createElement("div", { className: "pv-label" }, "Skill match"), PREVIEW.slice(0, 3).map((p) => /* @__PURE__ */ React.createElement("div", { className: "bar-row", key: p.id }, /* @__PURE__ */ React.createElement("span", null, p.name), /* @__PURE__ */ React.createElement("span", null, p.score, "%"), /* @__PURE__ */ React.createElement("div", { className: "bar" }, /* @__PURE__ */ React.createElement("i", { style: { width: p.score + "%" } })))), /* @__PURE__ */ React.createElement("div", { className: "pv-label" }, "Recommended training"), /* @__PURE__ */ React.createElement("div", { className: "pv-row" }, /* @__PURE__ */ React.createElement("span", { className: "icon-tile tile-blue" }, /* @__PURE__ */ React.createElement(Icon, { name: "cap", size: 18 })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("b", null, PREVIEW[0].name), /* @__PURE__ */ React.createElement("small", null, PREVIEW[0].duration.split(" (")[0], " \xB7 Sample NSQF Level ", PREVIEW[0].nsqf))), /* @__PURE__ */ React.createElement("div", { className: "pv-label" }, "Opportunities near you"), PREVIEW_JOBS.map((j) => /* @__PURE__ */ React.createElement("div", { className: "pv-row", key: j.id }, /* @__PURE__ */ React.createElement("span", { className: "icon-tile tile-teal" }, /* @__PURE__ */ React.createElement(Icon, { name: "briefcase", size: 18 })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("b", null, j.title), /* @__PURE__ */ React.createElement("small", null, j.loc, " \xB7 ", j.km, " km")), /* @__PURE__ */ React.createElement("span", { className: "pay" }, j.pay.split(" per")[0].replace(" to ", " \u2013 "))))));
+}
+function Home({ go }) {
+  const features = [
+    { icon: "mic", tile: "tile-blue", title: "Multilingual Voice Assistant", text: "Speak in Hindi, English or Hinglish. Where voice is not available, typing works just as well.", chips: ["Hindi", "English", "Hinglish"] },
+    { icon: "layers", tile: "tile-teal", title: "NSQF-Aligned Skill Pathways", text: "See training routes with duration, a sample NSQF level and a clear explanation of why each one fits.", chips: ["Explainable", "Illustrative levels"] },
+    { icon: "pin", tile: "tile-navy", title: "Hyperlocal Opportunities", text: "Jobs and self-employment ideas sorted by what is near you and how far you are willing to travel.", chips: ["Jobs", "Self-employment"] }
+  ];
+  const steps = [
+    { icon: "mic", t: "Speak", d: "Answer a few simple questions by voice or text." },
+    { icon: "user", t: "Build Profile", d: "Your skills, interests and preferences are gathered." },
+    { icon: "search", t: "Discover Skills", d: "Matching pathways appear, each with its reasons." },
+    { icon: "pin", t: "Find Opportunities", d: "See nearby work that fits your travel range." }
+  ];
+  return /* @__PURE__ */ React.createElement("main", null, /* @__PURE__ */ React.createElement("section", { className: "hero" }, /* @__PURE__ */ React.createElement("div", { className: "wrap hero-grid" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "eyebrow-light" }, /* @__PURE__ */ React.createElement(Icon, { name: "globe", size: 16 }), " Voice-Based Livelihood & Skill Assistant"), /* @__PURE__ */ React.createElement("h1", { className: "hero-title" }, /* @__PURE__ */ React.createElement("span", null, "Your Skills."), " ", /* @__PURE__ */ React.createElement("span", null, "Your Language."), " ", /* @__PURE__ */ React.createElement("span", null, "Your Livelihood.")), /* @__PURE__ */ React.createElement("p", { className: "hero-sub" }, "JeevikaAI listens in your language, understands what you can do and what you want to do, then suggests skill training and nearby work or self-employment options built around you."), /* @__PURE__ */ React.createElement("div", { className: "cta-row" }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-teal", onClick: () => go("assessment") }, /* @__PURE__ */ React.createElement(Icon, { name: "mic", size: 20 }), " Start Voice Assessment"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-light", onClick: () => go("dashboard", "opps") }, "Explore Opportunities ", /* @__PURE__ */ React.createElement(Icon, { name: "arrowR", size: 18 }))), /* @__PURE__ */ React.createElement("ul", { className: "proof" }, /* @__PURE__ */ React.createElement("li", null, /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 16 }), " Hindi, English and Hinglish"), /* @__PURE__ */ React.createElement("li", null, /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 16 }), " No sign-up needed"), /* @__PURE__ */ React.createElement("li", null, /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 16 }), " Voice or text"))), /* @__PURE__ */ React.createElement(Preview, null))), /* @__PURE__ */ React.createElement("section", { className: "section", id: "features" }, /* @__PURE__ */ React.createElement("div", { className: "wrap" }, /* @__PURE__ */ React.createElement("div", { className: "section-head" }, /* @__PURE__ */ React.createElement("div", { className: "eyebrow" }, "What JeevikaAI does"), /* @__PURE__ */ React.createElement("h2", null, "Built for people who are new to digital tools")), /* @__PURE__ */ React.createElement("div", { className: "grid-3" }, features.map((f) => /* @__PURE__ */ React.createElement("article", { className: "card", key: f.title }, /* @__PURE__ */ React.createElement("span", { className: "icon-tile " + f.tile }, /* @__PURE__ */ React.createElement(Icon, { name: f.icon, size: 24 })), /* @__PURE__ */ React.createElement("h3", null, f.title), /* @__PURE__ */ React.createElement("p", null, f.text), /* @__PURE__ */ React.createElement("div", { className: "chips" }, f.chips.map((c) => /* @__PURE__ */ React.createElement("span", { className: "chip", key: c }, c)))))))), /* @__PURE__ */ React.createElement("section", { className: "section band", id: "how" }, /* @__PURE__ */ React.createElement("div", { className: "wrap" }, /* @__PURE__ */ React.createElement("div", { className: "section-head" }, /* @__PURE__ */ React.createElement("div", { className: "eyebrow" }, "How it works"), /* @__PURE__ */ React.createElement("h2", null, "From a spoken answer to a local plan in four steps")), /* @__PURE__ */ React.createElement("ol", { className: "steps" }, steps.map((s, i) => /* @__PURE__ */ React.createElement("li", { className: "step", key: s.t }, /* @__PURE__ */ React.createElement("div", { className: "step-top" }, /* @__PURE__ */ React.createElement("span", { className: "icon-tile tile-blue" }, /* @__PURE__ */ React.createElement(Icon, { name: s.icon, size: 22 })), /* @__PURE__ */ React.createElement("span", { className: "step-n" }, i + 1)), /* @__PURE__ */ React.createElement("h3", null, s.t), /* @__PURE__ */ React.createElement("p", null, s.d)))))), /* @__PURE__ */ React.createElement("section", { className: "section" }, /* @__PURE__ */ React.createElement("div", { className: "wrap" }, /* @__PURE__ */ React.createElement("div", { className: "cta-band" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", null, "See the full demo in under two minutes"), /* @__PURE__ */ React.createElement("p", null, "Load the fictional beneficiary Sunita Devi, step through the questions and open the roadmap.")), /* @__PURE__ */ React.createElement("button", { className: "btn btn-teal", onClick: () => go("assessment") }, /* @__PURE__ */ React.createElement(Icon, { name: "mic", size: 20 }), " Start Voice Assessment")))));
+}
+function Assessment({ go, initial, onSubmit, notify }) {
+  const blank = { name: "", education: "", skills: "", interests: "", occupation: "", location: "", workType: "", mobility: "" };
+  const [lang, setLang] = useState("en");
+  const [answers, setAnswers] = useState(() => {
+    const a = { ...blank };
+    if (initial) FIELDS.forEach((k) => {
+      a[k] = initial[k] || "";
+    });
+    return a;
+  });
+  const [step, setStep] = useState(0);
+  const [mode, setMode] = useState("voice");
+  const [listening, setListening] = useState(false);
+  const [heard, setHeard] = useState("");
+  const [voiceMsg, setVoiceMsg] = useState({ kind: "idle", text: "" });
+  const recRef = useRef(null);
+  const stepRef = useRef(0);
+  const inputRef = useRef(null);
+  const SR = useMemo(() => window.SpeechRecognition || window.webkitSpeechRecognition || null, []);
+  const S = STEPS[step];
+  const L = LANGS.find((l) => l.k === lang);
+  const set = (k, v) => setAnswers((a) => ({ ...a, [k]: v }));
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
+  useEffect(() => {
+    if (recRef.current) {
+      try {
+        recRef.current.abort();
+      } catch (e) {
+      }
+      recRef.current = null;
+    }
+    setListening(false);
+    setHeard("");
+    setVoiceMsg({ kind: "idle", text: "" });
+  }, [step, lang]);
+  useEffect(() => () => {
+    if (recRef.current) {
+      try {
+        recRef.current.abort();
+      } catch (e) {
+      }
+    }
+  }, []);
+  function applyHeard(t) {
+    const s = STEPS[stepRef.current];
+    if (s.type === "choice") {
+      const low = t.toLowerCase();
+      let best = null, bestN = 0;
+      s.options.forEach((o) => {
+        const n = o.kw.filter((k) => low.includes(k.toLowerCase())).length;
+        if (n > bestN) {
+          best = o;
+          bestN = n;
+        }
+      });
+      if (best) {
+        set(s.key, best.v);
+        setVoiceMsg({ kind: "idle", text: "Understood: " + best.v + ". Please check it on the right." });
+      } else setVoiceMsg({ kind: "warn", text: "We heard you, but could not match that to an option. Please tap one on the right." });
+    } else if (s.key === "name") {
+      set("name", t.replace(/^(my name is|mera naam|मेरा नाम)\s+/i, "").replace(/\s+(hai|है)\.?$/i, "").trim());
+    } else set(s.key, t);
+  }
+  function startListening() {
+    setMode("voice");
+    if (!SR) {
+      setVoiceMsg({ kind: "err", text: "Voice capture is not supported in this browser, so nothing can be recorded. Please type your answer on the right." });
+      return;
+    }
+    if (recRef.current) {
+      try {
+        recRef.current.abort();
+      } catch (e) {
+      }
+    }
+    let rec;
+    try {
+      rec = new SR();
+    } catch (e) {
+      setVoiceMsg({ kind: "err", text: "Could not start voice capture. Please type your answer." });
+      return;
+    }
+    rec.lang = L.code;
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.maxAlternatives = 1;
+    let got = false;
+    rec.onstart = () => {
+      setListening(true);
+      setVoiceMsg({ kind: "live", text: "Listening. Speak your answer now." });
+    };
+    rec.onresult = (e) => {
+      let t = "";
+      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript + " ";
+      t = t.trim();
+      if (!t) return;
+      got = true;
+      setHeard(t);
+      if (e.results[e.results.length - 1].isFinal) applyHeard(t);
+    };
+    rec.onerror = (e) => {
+      const c = e && e.error;
+      const m = c === "not-allowed" || c === "service-not-allowed" ? "Microphone access is blocked in this view, so nothing was recorded. Use Continue with Text instead." : c === "no-speech" ? "No speech was detected. Try again, or type your answer." : c === "audio-capture" ? "No microphone was found on this device. Please type your answer." : c === "network" ? "The speech service could not be reached. Please type your answer." : c === "aborted" ? null : "Voice capture failed (" + (c || "unknown") + "). Please type your answer.";
+      if (m) setVoiceMsg({ kind: "err", text: m });
+    };
+    rec.onend = () => {
+      setListening(false);
+      if (recRef.current === rec) recRef.current = null;
+      setVoiceMsg((v) => v.kind === "live" ? { kind: "idle", text: got ? "Captured. Check the answer on the right and edit it if needed." : "Nothing was captured. Try again, or type your answer." } : v);
+    };
+    recRef.current = rec;
+    try {
+      rec.start();
+    } catch (err) {
+      recRef.current = null;
+      setVoiceMsg({ kind: "err", text: "Could not start voice capture. Please type your answer." });
+    }
+  }
+  function stopListening() {
+    if (recRef.current) {
+      try {
+        recRef.current.stop();
+      } catch (e) {
+      }
+    }
+  }
+  function toText() {
+    stopListening();
+    setMode("text");
+    setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus();
+    }, 30);
+  }
+  function loadDemo() {
+    setAnswers({ ...DEMO });
+    setStep(0);
+    notify("Demo beneficiary loaded: Sunita Devi (fictional). Press Next to review each answer.");
+  }
+  function toggleChip(label) {
+    const arr = splitList(answers[S.key]);
+    set(S.key, (arr.includes(label) ? arr.filter((x) => x !== label) : [...arr, label]).join(", "));
+  }
+  const val = answers[S.key] || "";
+  const canNext = S.optional || val.trim().length > 0;
+  const last = step === STEPS.length - 1;
+  const next = () => {
+    if (!canNext) return;
+    if (last) onSubmit({ ...answers, isDemo: isDemoProfile(answers) });
+    else setStep(step + 1);
+  };
+  const labelFor = (o) => lang === "hi" ? o.hi : o.v;
+  const qText = S.q[lang];
+  const showEn = lang !== "en";
+  let statusText = voiceMsg.text;
+  if (!statusText) statusText = !SR ? "Voice capture is not supported in this browser. Type your answers using the fields on the right." : "Tap the microphone or Start Listening, then speak. You can always type instead.";
+  const statusKind = voiceMsg.kind === "idle" && !SR ? "warn" : voiceMsg.kind;
+  return /* @__PURE__ */ React.createElement("main", { className: "wrap assess" }, /* @__PURE__ */ React.createElement("button", { className: "back-link", onClick: () => go("home") }, /* @__PURE__ */ React.createElement(Icon, { name: "arrowL", size: 18 }), " Back to home"), /* @__PURE__ */ React.createElement("div", { className: "assess-head" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", null, "Voice Assessment"), /* @__PURE__ */ React.createElement("p", null, "Answer eight short questions in your own language. Use your voice or type, whichever is easier.")), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", onClick: loadDemo }, /* @__PURE__ */ React.createElement(Icon, { name: "user", size: 18 }), " Load Demo Beneficiary ", /* @__PURE__ */ React.createElement("span", { className: "tag tag-warn" }, "Fictional"))), /* @__PURE__ */ React.createElement("div", { className: "assess-grid" }, /* @__PURE__ */ React.createElement("section", { className: "card stage", "aria-label": "Voice input" }, /* @__PURE__ */ React.createElement("div", { className: "seg", role: "radiogroup", "aria-label": "Language" }, LANGS.map((l) => /* @__PURE__ */ React.createElement("button", { key: l.k, role: "radio", "aria-checked": lang === l.k, onClick: () => setLang(l.k) }, /* @__PURE__ */ React.createElement("span", { lang: l.k === "hi" ? "hi" : void 0 }, l.label), /* @__PURE__ */ React.createElement("small", null, l.sub)))), /* @__PURE__ */ React.createElement("div", { className: "mic-wrap" }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "mic " + (listening ? "live" : "idle"),
+      onClick: listening ? stopListening : startListening,
+      "aria-label": listening ? "Stop listening" : "Start listening",
+      "aria-pressed": listening
+    },
+    /* @__PURE__ */ React.createElement(Icon, { name: listening ? "stop" : "mic", size: 52, sw: 1.8 })
+  )), /* @__PURE__ */ React.createElement(Wave, { on: listening }), /* @__PURE__ */ React.createElement("div", { className: "status " + statusKind, role: "status", "aria-live": "polite" }, statusText), heard && /* @__PURE__ */ React.createElement("div", { className: "heard" }, /* @__PURE__ */ React.createElement("small", null, "What the browser heard"), /* @__PURE__ */ React.createElement("span", { lang: lang === "hi" ? "hi" : void 0 }, "\u201C", heard, "\u201D")), /* @__PURE__ */ React.createElement("div", { className: "stage-actions" }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-teal", onClick: startListening, disabled: listening }, /* @__PURE__ */ React.createElement(Icon, { name: "mic", size: 18 }), " Start Listening"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", onClick: stopListening, disabled: !listening }, /* @__PURE__ */ React.createElement(Icon, { name: "stop", size: 18 }), " Stop Listening"), /* @__PURE__ */ React.createElement("button", { className: "btn " + (mode === "text" ? "btn-primary" : "btn-ghost"), onClick: toText }, /* @__PURE__ */ React.createElement(Icon, { name: "keyboard", size: 18 }), " Continue with Text"))), /* @__PURE__ */ React.createElement("section", { className: "card convo", "aria-label": "Questionnaire" }, /* @__PURE__ */ React.createElement("div", { className: "progress" }, /* @__PURE__ */ React.createElement("span", null, "Question ", step + 1, " of ", STEPS.length), /* @__PURE__ */ React.createElement("div", { className: "prog-bar", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": STEPS.length, "aria-valuenow": step + 1 }, /* @__PURE__ */ React.createElement("i", { style: { width: (step + 1) / STEPS.length * 100 + "%" } }))), /* @__PURE__ */ React.createElement("div", { className: "bubble" }, /* @__PURE__ */ React.createElement("span", { className: "who" }, "JeevikaAI asks \xB7 ", S.label), /* @__PURE__ */ React.createElement("b", { lang: lang === "hi" ? "hi" : void 0 }, qText), showEn && /* @__PURE__ */ React.createElement("span", { className: "sub-en" }, S.q.en)), /* @__PURE__ */ React.createElement("div", null, S.type === "choice" ? /* @__PURE__ */ React.createElement("div", { className: "choices", role: "radiogroup", "aria-label": S.label }, S.options.map((o) => /* @__PURE__ */ React.createElement("button", { key: o.v, className: "choice", role: "radio", "aria-checked": val === o.v, onClick: () => set(S.key, o.v) }, /* @__PURE__ */ React.createElement("span", { className: "dot" }, val === o.v && /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 12, sw: 3 })), /* @__PURE__ */ React.createElement("span", { lang: lang === "hi" ? "hi" : void 0 }, labelFor(o))))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("label", { className: "lbl", htmlFor: "answer" }, "Your answer", voiceMsg.kind === "idle" && heard ? " (edit if needed)" : ""), S.type === "area" ? /* @__PURE__ */ React.createElement("textarea", { id: "answer", ref: inputRef, className: "field", value: val, onChange: (e) => set(S.key, e.target.value), placeholder: S.ph[lang] }) : /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      id: "answer",
+      ref: inputRef,
+      className: "field",
+      value: val,
+      onChange: (e) => set(S.key, e.target.value),
+      placeholder: S.ph[lang],
+      onKeyDown: (e) => {
+        if (e.key === "Enter") next();
+      }
+    }
+  ), S.chips && /* @__PURE__ */ React.createElement("div", { className: "chips", style: { marginTop: 12 } }, S.chips.map((c) => {
+    const label = lang === "hi" ? c.hi : c.en;
+    return /* @__PURE__ */ React.createElement("button", { key: c.en, className: "chip", "aria-pressed": splitList(val).includes(label), onClick: () => toggleChip(label) }, label);
+  })))), /* @__PURE__ */ React.createElement("div", { className: "nav-row" }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", onClick: () => setStep(step - 1), disabled: step === 0 }, /* @__PURE__ */ React.createElement(Icon, { name: "arrowL", size: 18 }), " Back"), /* @__PURE__ */ React.createElement("div", { className: "dots", "aria-hidden": "true" }, STEPS.map((_, i) => /* @__PURE__ */ React.createElement("i", { key: i, className: i <= step ? "on" : "" }))), /* @__PURE__ */ React.createElement("button", { className: "btn btn-primary", onClick: next, disabled: !canNext }, last ? "See my roadmap" : "Next", " ", /* @__PURE__ */ React.createElement(Icon, { name: "arrowR", size: 18 }))))), lang !== "en" && /* @__PURE__ */ React.createElement("section", { className: "card examples", "aria-label": "Example conversation" }, /* @__PURE__ */ React.createElement("h3", null, lang === "hi" ? "Example Hindi conversation" : "Example Hinglish conversation"), /* @__PURE__ */ React.createElement("p", { className: "muted" }, "Scripted examples that show how answers can sound. These are not recordings."), /* @__PURE__ */ React.createElement("div", { className: "ex-grid" }, EXAMPLES[lang].map((x) => /* @__PURE__ */ React.createElement("div", { className: "ex-card", key: x.q }, /* @__PURE__ */ React.createElement("div", { className: "q", lang: lang === "hi" ? "hi" : void 0 }, x.q), /* @__PURE__ */ React.createElement("div", { className: "a", lang: lang === "hi" ? "hi" : void 0 }, x.a), /* @__PURE__ */ React.createElement("small", null, x.en))))));
+}
+function Dashboard({ profile, hasAssessment, go, notify, openSummary }) {
+  const ranked = useMemo(() => rankPaths(profile), [profile]);
+  const top = ranked.slice(0, 3);
+  const jobs = useMemo(() => rankJobs(profile, ranked), [profile, ranked]);
+  const [open, setOpen] = useState({});
+  const [sel, setSel] = useState(top[0].id);
+  const [done, setDone] = useState({});
+  const [filter, setFilter] = useState("All");
+  const [short, setShort] = useState({});
+  const selP = ranked.find((p) => p.id === sel) || top[0];
+  const doneN = [0, 1, 2].filter((i) => done[selP.id + i]).length;
+  const shown = jobs.filter((j) => filter === "All" || j.type === filter);
+  const nShort = Object.values(short).filter(Boolean).length;
+  async function download() {
+    const text = buildSummary(profile, ranked, jobs, sel, short);
+    const fname = "JeevikaAI-summary-" + slug(profile.name) + ".txt";
+    try {
+      const d = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
+      if (d) {
+        await d.save({ filename: fname, data: text });
+        notify("Summary saved as " + fname);
+        return;
+      }
+    } catch (e) {
+      if (e && e.code === "declined") {
+        notify("Download cancelled.");
+        return;
+      }
+    }
+    openSummary({ text, fname });
+  }
+  return /* @__PURE__ */ React.createElement("main", null, /* @__PURE__ */ React.createElement("div", { className: "wrap" }, /* @__PURE__ */ React.createElement("div", { className: "dash-head" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "eyebrow" }, "Personalised for ", profile.name), /* @__PURE__ */ React.createElement("h1", null, "Your Livelihood Roadmap"), /* @__PURE__ */ React.createElement("p", { className: "hi-sub", lang: "hi" }, "\u0906\u092A\u0915\u093E \u0906\u091C\u0940\u0935\u093F\u0915\u093E \u0930\u094B\u0921\u092E\u0948\u092A")), /* @__PURE__ */ React.createElement("div", { className: "dash-actions" }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-primary", onClick: () => scrollToId("roadmap") }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 18 }), " View Learning Roadmap"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", onClick: () => scrollToId("opps") }, /* @__PURE__ */ React.createElement(Icon, { name: "briefcase", size: 18 }), " Explore Jobs"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", onClick: download }, /* @__PURE__ */ React.createElement(Icon, { name: "download", size: 18 }), " Download Summary"))), /* @__PURE__ */ React.createElement("div", { className: "notice", role: "note" }, /* @__PURE__ */ React.createElement(Icon, { name: "info", size: 18 }), /* @__PURE__ */ React.createElement("span", null, "All recommendations, course details, NSQF levels and job listings on this page are illustrative demo data. They are not verified live listings or official certifications.", profile.isDemo && " Sunita Devi is a fictional beneficiary.", !hasAssessment && " You have not taken the assessment yet, so this page shows the sample beneficiary.")), /* @__PURE__ */ React.createElement("div", { className: "dash-grid" }, /* @__PURE__ */ React.createElement("aside", { className: "card profile", "aria-label": "Beneficiary profile" }, /* @__PURE__ */ React.createElement("div", { className: "pv-head" }, /* @__PURE__ */ React.createElement("div", { className: "avatar lg" }, (profile.name || "?").trim().charAt(0).toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement("h2", { style: { fontSize: "1.3rem" } }, profile.name), /* @__PURE__ */ React.createElement("div", { className: "pv-meta" }, /* @__PURE__ */ React.createElement(Icon, { name: "pin", size: 13 }), " ", profile.location))), profile.isDemo && /* @__PURE__ */ React.createElement("span", { className: "tag tag-warn" }, "Fictional sample data"), /* @__PURE__ */ React.createElement("dl", { className: "prof-list" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("dt", null, "Education"), /* @__PURE__ */ React.createElement("dd", null, profile.education)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("dt", null, "Existing skills"), /* @__PURE__ */ React.createElement("dd", null, /* @__PURE__ */ React.createElement("div", { className: "chips" }, splitList(profile.skills).map((s) => /* @__PURE__ */ React.createElement("span", { className: "chip", key: s }, s)), !splitList(profile.skills).length && "Not shared"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("dt", null, "Interests"), /* @__PURE__ */ React.createElement("dd", null, /* @__PURE__ */ React.createElement("div", { className: "chips" }, splitList(profile.interests).map((s) => /* @__PURE__ */ React.createElement("span", { className: "chip", key: s }, s)), !splitList(profile.interests).length && "Not shared"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("dt", null, "Current occupation"), /* @__PURE__ */ React.createElement("dd", null, profile.occupation || "Not shared")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("dt", null, "Preferred work"), /* @__PURE__ */ React.createElement("dd", null, profile.workType)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("dt", null, "Mobility"), /* @__PURE__ */ React.createElement("dd", null, profile.mobility))), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", style: { width: "100%" }, onClick: () => go("assessment") }, /* @__PURE__ */ React.createElement(Icon, { name: "edit", size: 18 }), " Change Profile")), /* @__PURE__ */ React.createElement("div", { className: "stack" }, /* @__PURE__ */ React.createElement("section", { id: "paths", "aria-label": "Suggested skill pathways" }, /* @__PURE__ */ React.createElement("div", { className: "block-head" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", null, "Suggested skill pathways"), /* @__PURE__ */ React.createElement("p", null, "Scored with transparent rules from your answers, not a trained model. Open any card to see every factor."))), /* @__PURE__ */ React.createElement("div", { className: "stack" }, top.map((p, i) => /* @__PURE__ */ React.createElement("article", { className: "card path-card", key: p.id }, /* @__PURE__ */ React.createElement("div", { className: "path-top" }, /* @__PURE__ */ React.createElement("span", { className: "icon-tile " + (i === 0 ? "tile-teal" : i === 1 ? "tile-blue" : "tile-navy") }, /* @__PURE__ */ React.createElement(Icon, { name: p.icon, size: 24 })), /* @__PURE__ */ React.createElement("div", { className: "grow" }, /* @__PURE__ */ React.createElement("div", { className: "rank" }, "Recommendation ", i + 1), /* @__PURE__ */ React.createElement("h3", null, p.name), /* @__PURE__ */ React.createElement("div", { className: "muted", lang: "hi" }, p.hi, " \xB7 ", p.role)), /* @__PURE__ */ React.createElement(Ring, { value: p.score })), /* @__PURE__ */ React.createElement("div", { className: "path-meta" }, /* @__PURE__ */ React.createElement("span", { className: "tag tag-mute" }, /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 13 }), " ", p.duration), /* @__PURE__ */ React.createElement("span", { className: "tag" }, /* @__PURE__ */ React.createElement(Icon, { name: "layers", size: 13 }), " Sample NSQF Level ", p.nsqf), /* @__PURE__ */ React.createElement("span", { className: "tag tag-warn" }, "Illustrative demo data")), /* @__PURE__ */ React.createElement("p", { className: "fit" }, p.fit), /* @__PURE__ */ React.createElement("div", { className: "path-actions" }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost btn-sm", "aria-expanded": !!open[p.id], onClick: () => setOpen({ ...open, [p.id]: !open[p.id] }) }, /* @__PURE__ */ React.createElement(Icon, { name: "bulb", size: 16 }), " Why this recommendation? ", /* @__PURE__ */ React.createElement(Icon, { name: "chev", size: 16, style: { transform: open[p.id] ? "rotate(180deg)" : "none", transition: "transform .2s" } })), /* @__PURE__ */ React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => {
+    setSel(p.id);
+    scrollToId("roadmap");
+  } }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 16 }), " View Learning Roadmap")), open[p.id] && /* @__PURE__ */ React.createElement("div", { className: "why" }, p.factors.map((x) => /* @__PURE__ */ React.createElement("div", { className: "factor", key: x.k }, /* @__PURE__ */ React.createElement("b", null, x.label), /* @__PURE__ */ React.createElement("span", { className: "pts" + (x.pts < 0 ? " neg" : "") }, x.pts > 0 ? "+" : x.pts < 0 ? "\u2212" : "", Math.abs(x.pts)), /* @__PURE__ */ React.createElement("div", { className: "bar" }, /* @__PURE__ */ React.createElement("i", { style: { width: Math.max(0, x.pts) / 36 * 100 + "%", animationDuration: ".5s" } })), /* @__PURE__ */ React.createElement("p", null, x.note))), /* @__PURE__ */ React.createElement("div", { className: "total" }, "Total ", p.raw, p.raw > 98 ? ", capped at 98 because this is an estimate and not a guarantee" : "", ". Every score comes from the rules above, so a different answer in the assessment changes the result.")))))), /* @__PURE__ */ React.createElement("section", { id: "roadmap", className: "card", "aria-label": "Learning roadmap" }, /* @__PURE__ */ React.createElement("div", { className: "block-head", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", null, "Your learning roadmap"), /* @__PURE__ */ React.createElement("p", null, "Illustrative three-stage plan for the pathway you pick. Mark each stage as done to track progress."))), /* @__PURE__ */ React.createElement("div", { className: "tabs", role: "group", "aria-label": "Choose pathway" }, top.map((p) => /* @__PURE__ */ React.createElement("button", { key: p.id, "aria-pressed": sel === p.id, onClick: () => setSel(p.id) }, p.name))), /* @__PURE__ */ React.createElement("div", { className: "timeline" }, selP.stages.map((s, i) => {
+    const k = selP.id + i, isDone = !!done[k];
+    return /* @__PURE__ */ React.createElement("div", { className: "stage-card" + (isDone ? " done" : ""), key: k }, /* @__PURE__ */ React.createElement("span", { className: "k" }, "Stage ", i + 1, " \xB7 ", STAGE_TITLES[i]), /* @__PURE__ */ React.createElement("h4", null, s[0]), /* @__PURE__ */ React.createElement("p", null, s[1]), /* @__PURE__ */ React.createElement("span", { className: "wk" }, s[2]), /* @__PURE__ */ React.createElement("button", { className: "btn btn-sm " + (isDone ? "btn-teal" : "btn-ghost"), "aria-pressed": isDone, onClick: () => setDone({ ...done, [k]: !isDone }) }, /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 16 }), " ", isDone ? "Done" : "Mark as done"));
+  })), /* @__PURE__ */ React.createElement("div", { className: "road-progress" }, /* @__PURE__ */ React.createElement("span", null, doneN, " of 3 stages done"), /* @__PURE__ */ React.createElement("div", { className: "prog-bar" }, /* @__PURE__ */ React.createElement("i", { style: { width: doneN / 3 * 100 + "%" } })))), /* @__PURE__ */ React.createElement("section", { id: "opps", "aria-label": "Local opportunities" }, /* @__PURE__ */ React.createElement("div", { className: "block-head" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", null, "Local opportunities"), /* @__PURE__ */ React.createElement("p", null, "Sample listings sorted by fit and distance. They are fictional and not live vacancies.", nShort ? " " + nShort + " shortlisted." : "")), /* @__PURE__ */ React.createElement("div", { className: "filters", role: "group", "aria-label": "Filter by work type" }, ["All", "Job", "Self-employment"].map((f) => /* @__PURE__ */ React.createElement("button", { key: f, className: "chip", "aria-pressed": filter === f, onClick: () => setFilter(f) }, f)))), shown.length ? /* @__PURE__ */ React.createElement("div", { className: "opp-grid" }, shown.map((j) => /* @__PURE__ */ React.createElement("article", { className: "card opp" + (j.inRange ? "" : " far"), key: j.id }, /* @__PURE__ */ React.createElement("div", { className: "opp-top" }, /* @__PURE__ */ React.createElement("span", { className: "tag " + (j.type === "Job" ? "" : "tag-teal") }, j.type), /* @__PURE__ */ React.createElement("span", { className: "tag tag-warn" }, "Sample listing"), !j.inRange && /* @__PURE__ */ React.createElement("span", { className: "tag tag-mute" }, "Outside your travel range")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", null, j.title), /* @__PURE__ */ React.createElement("div", { className: "org" }, j.org)), /* @__PURE__ */ React.createElement("div", { className: "opp-facts" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(Icon, { name: "pin", size: 16 }), " ", j.loc, " \xB7 ", kmLabel(j)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(Icon, { name: "rupee", size: 16 }), " ", j.pay)), /* @__PURE__ */ React.createElement("div", { className: "opp-foot" }, /* @__PURE__ */ React.createElement("span", { className: "chip" }, pathName(j.path)), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost btn-sm star", "aria-pressed": !!short[j.id], onClick: () => setShort({ ...short, [j.id]: !short[j.id] }) }, /* @__PURE__ */ React.createElement(Icon, { name: "star", size: 16 }), " ", short[j.id] ? "Shortlisted" : "Shortlist"))))) : /* @__PURE__ */ React.createElement("div", { className: "empty" }, "No sample listings for this filter. Choose All to see every listing."))))));
+}
+function SummaryModal({ data, onClose, notify }) {
+  const preRef = useRef(null);
+  useEffect(() => {
+    const h = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(data.text);
+      notify("Summary copied.");
+      return;
+    } catch (e) {
+    }
+    try {
+      const r = document.createRange();
+      r.selectNodeContents(preRef.current);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      notify("Text selected. Press copy on your device.");
+    } catch (e) {
+    }
+  }
+  return /* @__PURE__ */ React.createElement("div", { className: "overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "modal", role: "dialog", "aria-modal": "true", "aria-label": "Summary", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "modal-head" }, /* @__PURE__ */ React.createElement("h3", null, "Your summary"), /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost btn-sm", onClick: onClose, "aria-label": "Close" }, /* @__PURE__ */ React.createElement(Icon, { name: "x", size: 16 }))), /* @__PURE__ */ React.createElement("pre", { ref: preRef }, data.text), /* @__PURE__ */ React.createElement("div", { className: "modal-foot" }, /* @__PURE__ */ React.createElement("button", { className: "btn btn-primary btn-sm", onClick: copy }, /* @__PURE__ */ React.createElement(Icon, { name: "copy", size: 16 }), " Copy text"), /* @__PURE__ */ React.createElement("span", { className: "muted", style: { alignSelf: "center", fontSize: ".85rem" } }, "File saving is not available in this view. Copy the text instead."))));
+}
+function App() {
+  const [route, setRoute] = useState("home");
+  const [profile, setProfile] = useState(null);
+  const [toast, setToast] = useState("");
+  const [summary, setSummary] = useState(null);
+  const pending = useRef(null);
+  const timer = useRef(null);
+  const notify = (m) => {
+    setToast(m);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setToast(""), 4200);
+  };
+  const go = (r, sec) => {
+    if (r === route) {
+      if (sec && document.getElementById(sec)) scrollToId(sec);
+      else window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    pending.current = sec || null;
+    setRoute(r);
+  };
+  useEffect(() => {
+    const id = pending.current;
+    pending.current = null;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = id && document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      else window.scrollTo({ top: 0, behavior: "auto" });
+    }));
+  }, [route]);
+  const active = profile || { ...DEMO, isDemo: true };
+  return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Nav, { route, go }), route === "home" && /* @__PURE__ */ React.createElement(Home, { go }), route === "assessment" && /* @__PURE__ */ React.createElement(Assessment, { go, initial: profile, notify, onSubmit: (p) => {
+    setProfile(p);
+    go("dashboard");
+  } }), route === "dashboard" && /* @__PURE__ */ React.createElement(Dashboard, { key: JSON.stringify(active), profile: active, hasAssessment: !!profile, go, notify, openSummary: setSummary }), /* @__PURE__ */ React.createElement(Footer, { go }), summary && /* @__PURE__ */ React.createElement(SummaryModal, { data: summary, onClose: () => setSummary(null), notify }), toast && /* @__PURE__ */ React.createElement("div", { className: "toast", role: "status" }, toast));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(/* @__PURE__ */ React.createElement(App, null));
+
+</script>
