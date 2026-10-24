@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Icon } from './Icons';
 import { DEMO, PATHWAYS } from '../data/mockData';
 import { evaluatePathway, rankJobs } from '../services/recommendationEngine';
