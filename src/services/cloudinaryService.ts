@@ -2,11 +2,11 @@ import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, increment, serv
 import { getDb, isRealFirebaseConfigured } from './firebase';
 import { HeroSlide, MediaAssetRecord, ShowcaseProduct } from '../types';
 
-// Cloudinary Configuration (Cloud Name and Upload Preset from User's Media Studio)
+// Cloudinary Configuration (Cloud Name and Upload Preset provided by user)
 export const CLOUDINARY_CLOUD_NAME =
-  (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string) || 'dm9hqkipf';
+  (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string) || 'kvyah2au';
 export const CLOUDINARY_UPLOAD_PRESET =
-  (import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string) || 'e3vvwepk';
+  (import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string) || 'jeevikaai';
 
 export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
