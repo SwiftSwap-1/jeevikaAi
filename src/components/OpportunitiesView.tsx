@@ -6,7 +6,7 @@ import { JOBS } from '../data/mockData';
 import { t } from '../services/translationService';
 import { contentService, OperationType, handleFirestoreError } from '../services/firebase';
 import { speechService } from '../services/speechService';
-import { POPULAR_INDIAN_REGIONS } from '../services/locationIntelligenceService';
+import { POPULAR_INDIAN_REGIONS, locationIntelligenceService } from '../services/locationIntelligenceService';
 
 interface OpportunitiesViewProps {
   onShortlistToggle: (id: string) => void;
@@ -23,6 +23,7 @@ interface OpportunitiesViewProps {
 
 interface EnrichedOpportunity extends Opportunity {
   isLiveFirestore?: boolean;
+  fromLocationData?: boolean;
 }
 
 export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
@@ -49,12 +50,15 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
   // Audio narration state for low-literacy beneficiaries
   const [speakingJobId, setSpeakingJobId] = useState<string | null>(null);
 
-  // Current active district
+  const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
+
+  // Current active district (handles "Locality, District, State" or "District, State")
   const initialDistrict = useMemo(() => {
     if (locationData?.district) return locationData.district;
     if (userProfile?.location) {
-      const parts = userProfile.location.split(',');
-      return parts[0]?.trim() || 'Maharajganj';
+      const parts = userProfile.location.split(',').map((p) => p.trim()).filter(Boolean);
+      const dist = parts.length >= 3 ? parts[parts.length - 2] : parts[0];
+      return dist || 'Maharajganj';
     }
     return 'Maharajganj';
   }, [locationData?.district, userProfile?.location]);
@@ -66,8 +70,28 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
   useEffect(() => {
     if (locationData?.district && locationData.district !== selectedDistrict) {
       setSelectedDistrict(locationData.district);
+    } else if (!locationData?.district && initialDistrict && initialDistrict !== selectedDistrict) {
+      setSelectedDistrict(initialDistrict);
     }
-  }, [locationData?.district]);
+  }, [locationData?.district, initialDistrict]);
+
+  const handleAutoDetectCurrentLocation = async () => {
+    if (isDetectingGps) return;
+    setIsDetectingGps(true);
+    try {
+      const detected = await locationIntelligenceService.detectGpsLocation();
+      if (detected && detected.location) {
+        setSelectedDistrict(detected.district || detected.location.split(',')[0].trim());
+        if (onLocationChange) {
+          onLocationChange(detected.location);
+        }
+      }
+    } catch {
+      // Ignore if permission denied
+    } finally {
+      setIsDetectingGps(false);
+    }
+  };
 
   // Real-time Firestore Subscription to 'opportunities' collection
   useEffect(() => {
@@ -86,7 +110,6 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
       (err) => {
         if (!isSubscribed) return;
         setIsLoadingFirestore(false);
-        // Error handling compliant with Firebase skill
         handleFirestoreError(err, OperationType.LIST, 'opportunities');
         setFirestoreError(
           currentLang === 'bho'
@@ -109,28 +132,42 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
     const list: EnrichedOpportunity[] = [];
     const seenKeys = new Set<string>();
 
-    // 1. First add real-time Firestore opportunities
+    // 1. First add locationData opportunities (already tailored to active location)
+    if (locationData?.opportunities && locationData.opportunities.length > 0) {
+      locationData.opportunities.forEach((opp) => {
+        if (opp.type === 'Training') return;
+        const key = `${opp.title.toLowerCase().trim()}|${opp.org.toLowerCase().trim()}`;
+        if (!seenKeys.has(key) && !seenKeys.has(opp.id)) {
+          seenKeys.add(key);
+          seenKeys.add(opp.id);
+          list.push({
+            ...opp,
+            km: typeof opp.km === 'number' ? opp.km : 4,
+            isLiveFirestore: false,
+            fromLocationData: true,
+          });
+        }
+      });
+    }
+
+    // 2. Add real-time Firestore opportunities
     firestoreOpportunities.forEach((opp) => {
-      if (opp.type === 'Training') return; // Training handled in TrainingView
-      const key = `${opp.title.toLowerCase().trim()}|${opp.org.toLowerCase().trim()}`;
-      seenKeys.add(key);
-      seenKeys.add(opp.id);
-      list.push({ ...opp, isLiveFirestore: true });
-    });
-
-    // 2. Add locationData / seeded JOBS if not already present from Firestore
-    const baseSource =
-      locationData && locationData.opportunities && locationData.opportunities.length > 0
-        ? locationData.opportunities
-        : JOBS.filter((j) => j.type !== 'Training');
-
-    baseSource.forEach((opp) => {
       if (opp.type === 'Training') return;
       const key = `${opp.title.toLowerCase().trim()}|${opp.org.toLowerCase().trim()}`;
       if (!seenKeys.has(key) && !seenKeys.has(opp.id)) {
         seenKeys.add(key);
         seenKeys.add(opp.id);
-        list.push({ ...opp, isLiveFirestore: false });
+        list.push({ ...opp, isLiveFirestore: true, fromLocationData: false });
+      }
+    });
+
+    // 3. Add seeded JOBS if list is still empty or needs extra district variety
+    JOBS.filter((j) => j.type !== 'Training').forEach((opp) => {
+      const key = `${opp.title.toLowerCase().trim()}|${opp.org.toLowerCase().trim()}`;
+      if (!seenKeys.has(key) && !seenKeys.has(opp.id)) {
+        seenKeys.add(key);
+        seenKeys.add(opp.id);
+        list.push({ ...opp, isLiveFirestore: false, fromLocationData: false });
       }
     });
 
@@ -138,35 +175,42 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
   }, [firestoreOpportunities, locationData]);
 
   // District filter matcher
-  const matchesDistrict = (opp: Opportunity, districtName: string): boolean => {
+  const matchesDistrict = (opp: EnrichedOpportunity, districtName: string): boolean => {
     if (!districtName || districtName === 'all' || districtName.toLowerCase() === 'all india') {
+      return true;
+    }
+    // Items generated specifically for the current locationData always match the active district
+    if (
+      opp.fromLocationData &&
+      (!locationData?.district ||
+        locationData.district.toLowerCase().trim() === districtName.toLowerCase().trim() ||
+        (locationData.location || '').toLowerCase().includes(districtName.toLowerCase().trim()))
+    ) {
       return true;
     }
     const dLower = districtName.toLowerCase().trim();
     const locLower = (opp.loc || '').toLowerCase();
+    const orgLower = (opp.org || '').toLowerCase();
     const explicitDistrict = ((opp as any).district || '').toLowerCase();
 
-    // Check location string or district field
-    if (locLower.includes(dLower) || explicitDistrict.includes(dLower)) {
+    if (locLower.includes(dLower) || orgLower.includes(dLower) || explicitDistrict.includes(dLower)) {
       return true;
     }
-    // Statewide/National opportunities also apply
     if (locLower.includes('all india') || locLower.includes('statewide') || locLower.includes('anywhere')) {
       return true;
     }
     return false;
   };
 
-  // Filtered list based on active tab, district, and search query
+  // Filtered list based on active tab, district, and search query (with non-blank guarantee)
   const filtered = useMemo(() => {
-    return combinedOpportunities.filter((j) => {
+    const applyTabAndSearch = (j: EnrichedOpportunity, enforceDistrict: boolean) => {
       if (j.type === 'Training') return false;
-      if (activeTab === 'nearby' && j.km > 10) return false;
-      if (activeTab === 'district' && j.km > 40) return false;
+      if (activeTab === 'nearby' && (j.km || 0) > 15) return false;
+      if (activeTab === 'district' && (j.km || 0) > 45) return false;
       if (activeTab === 'self' && j.type !== 'Self-employment') return false;
 
-      // Location / District filter
-      if (!matchesDistrict(j, selectedDistrict)) {
+      if (enforceDistrict && !matchesDistrict(j, selectedDistrict)) {
         return false;
       }
 
@@ -180,8 +224,20 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
         );
       }
       return true;
-    });
-  }, [combinedOpportunities, activeTab, selectedDistrict, searchQuery]);
+    };
+
+    const strictMatches = combinedOpportunities.filter((j) => applyTabAndSearch(j, true));
+    if (strictMatches.length > 0 || searchQuery.trim()) {
+      return strictMatches;
+    }
+    // Never leave the page blank if district string didn't match literal substring
+    const locationDataMatches = combinedOpportunities
+      .filter((j) => j.fromLocationData && applyTabAndSearch(j, false));
+    if (locationDataMatches.length > 0) {
+      return locationDataMatches;
+    }
+    return combinedOpportunities.filter((j) => applyTabAndSearch(j, false));
+  }, [combinedOpportunities, activeTab, selectedDistrict, searchQuery, locationData]);
 
   // Audio narration handler for low-literacy users
   const handleListen = (job: Opportunity) => {
@@ -264,6 +320,22 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <button
+              type="button"
+              onClick={handleAutoDetectCurrentLocation}
+              disabled={isDetectingGps}
+              className="px-3.5 py-2 rounded-xl bg-[#287D73] hover:bg-[#17365D] text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-60"
+              title="अपनी वर्तमान जीपीएस लोकेशन से अवसर सिंक करें"
+            >
+              <Icon name="mapPin" size={14} />
+              <span>
+                {isDetectingGps
+                  ? 'लोकेशन खोजी जा रही है...'
+                  : currentLang === 'en'
+                  ? 'Sync Current GPS'
+                  : 'वर्तमान लोकेशन सिंक करें'}
+              </span>
+            </button>
 
             <button
               onClick={() => go('dashboard')}
@@ -399,8 +471,11 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
                 </div>
 
                 <div>
-                  <div className="text-xs font-semibold text-[#287D73] mb-1">
-                    📍 {job.loc} {job.km ? `· ${job.km} km away` : ''}
+                  <div className="text-xs font-bold text-[#287D73] mb-1 flex items-center gap-1.5 flex-wrap">
+                    <span>📍 {job.loc}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-[#287D73]/10 text-[#287D73] text-[11px] font-extrabold">
+                      आपके स्थान से {typeof job.km === 'number' && job.km > 0 ? job.km : 4} km दूर
+                    </span>
                   </div>
                   <h3 className="text-lg font-bold text-[#17365D] leading-snug">
                     {job.title}
@@ -425,24 +500,26 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-[#DCE3EA] flex items-center justify-between gap-2">
-                <button
-                  onClick={() => onSelectDetail(job)}
-                  className="text-xs font-extrabold text-[#245A91] hover:underline inline-flex items-center gap-1 min-h-[44px] items-center"
-                >
-                  <span>
-                    {currentLang === 'bho'
-                      ? 'योग्यता व आवेदन देखीं'
-                      : currentLang === 'en'
-                      ? 'View Eligibility & Apply'
-                      : 'योग्यता देखें व आवेदन करें'}
-                  </span>
-                  <Icon name="arrow" size={14} />
-                </button>
+              <div className="pt-3 border-t border-[#DCE3EA] flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onSelectDetail(job)}
+                    className="px-3.5 py-2 rounded-xl bg-[#245A91] text-white hover:bg-[#17365D] text-xs font-extrabold inline-flex items-center gap-1.5 min-h-[40px] transition-colors shadow-2xs"
+                  >
+                    <Icon name="mapPin" size={13} />
+                    <span>
+                      {currentLang === 'bho'
+                        ? 'मैप व आवेदन देखीं'
+                        : currentLang === 'en'
+                        ? 'View Map & Apply'
+                        : 'मैप, रास्ता व आवेदन देखें'}
+                    </span>
+                  </button>
+                </div>
 
                 <button
                   onClick={() => onShortlistToggle(job.id)}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1 min-h-[44px] ${
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1 min-h-[40px] ${
                     isSaved
                       ? 'bg-[#17365D] text-white border-[#17365D]'
                       : 'bg-white text-[#5F6B76] border-[#DCE3EA] hover:border-[#245A91]'

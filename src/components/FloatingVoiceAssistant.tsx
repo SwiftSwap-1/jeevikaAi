@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LogoMark } from './Logo';
 import { Icon } from './Icons';
-import { SupportedLanguage, AppView, BeneficiaryProfile } from '../types';
+import { SupportedLanguage, AppView, BeneficiaryProfile, LocationLivelihoodData } from '../types';
 import { speechService, SpeechRecognitionResultWrapper } from '../services/speechService';
 import { processLocalAssistantQuery } from '../services/aiAssistantEngine';
 import { voiceVocabularyCache } from '../services/voiceVocabularyCache';
@@ -17,6 +17,7 @@ interface FloatingVoiceAssistantProps {
   onUpdateProfile?: (updated: BeneficiaryProfile) => void;
   activeLocation?: string;
   onLocationChange?: (newLoc: string) => void;
+  locationData?: LocationLivelihoodData | null;
 }
 
 export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
@@ -28,10 +29,12 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
   onUpdateProfile,
   activeLocation,
   onLocationChange,
+  locationData,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [isSettlingAfterSpeech, setIsSettlingAfterSpeech] = useState<boolean>(false);
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [isInterrupted, setIsInterrupted] = useState<boolean>(false);
   const [liveTranscript, setLiveTranscript] = useState<string>('');
@@ -49,12 +52,39 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const processingRef = useRef<boolean>(false);
   const isOpenRef = useRef<boolean>(false);
+  const isSpeakingRef = useRef<boolean>(false);
+  const isSettlingRef = useRef<boolean>(false);
   const bargeInTimerRef = useRef<number | null>(null);
+  const postSpeechCooldownTimerRef = useRef<number | null>(null);
+  const finalSpeechDebounceTimerRef = useRef<number | null>(null);
+  const interimSilenceTimerRef = useRef<number | null>(null);
   const interruptBadgeTimerRef = useRef<number | null>(null);
+
+  // Real-time Canvas Waveform & Web Audio Analyser refs
+  const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const speechBoostRef = useRef<number>(0);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
+
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
+
+  useEffect(() => {
+    isSettlingRef.current = isSettlingAfterSpeech;
+  }, [isSettlingAfterSpeech]);
+
+  // Boost waveform amplitude immediately when interim speech transcript updates
+  useEffect(() => {
+    if (liveTranscript) {
+      speechBoostRef.current = 1.0;
+    }
+  }, [liveTranscript]);
 
   // Draggable floating icon position state
   const [customPosition, setCustomPosition] = useState<{ x: number; y: number } | null>(() => {
@@ -214,21 +244,42 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, liveTranscript, isAiThinking]);
 
-  /**
-   * Interruption Handler:
-   * Invoked immediately when the user starts speaking while the AI is outputting audio.
-   * Stops playback, clears the synthesis & Web Audio buffer, and transitions to 'listening' mode.
-   */
-  const handleUserInterruption = () => {
+  const clearAllVoiceTimers = () => {
     if (bargeInTimerRef.current) {
       window.clearTimeout(bargeInTimerRef.current);
       bargeInTimerRef.current = null;
     }
+    if (postSpeechCooldownTimerRef.current) {
+      window.clearTimeout(postSpeechCooldownTimerRef.current);
+      postSpeechCooldownTimerRef.current = null;
+    }
+    if (finalSpeechDebounceTimerRef.current) {
+      window.clearTimeout(finalSpeechDebounceTimerRef.current);
+      finalSpeechDebounceTimerRef.current = null;
+    }
+    if (interimSilenceTimerRef.current) {
+      window.clearTimeout(interimSilenceTimerRef.current);
+      interimSilenceTimerRef.current = null;
+    }
+  };
+
+  /**
+   * Interruption Handler:
+   * Invoked when the user explicitly taps the mic/waveform to interrupt while the AI is outputting audio.
+   * Stops playback, clears the synthesis & Web Audio buffer, waits briefly for hardware audio to settle,
+   * and transitions cleanly to 'listening' mode.
+   */
+  const handleUserInterruption = () => {
+    clearAllVoiceTimers();
 
     // Stop AI playback & flush audio buffer immediately
     speechService.interruptAndClearAudioBuffer(false);
+    speechService.stopListening();
+    isSpeakingRef.current = false;
+    isSettlingRef.current = true;
     setIsSpeaking(false);
-    setIsListening(true);
+    setIsListening(false);
+    setIsSettlingAfterSpeech(true);
     setIsInterrupted(true);
 
     if (interruptBadgeTimerRef.current) {
@@ -238,10 +289,14 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
       setIsInterrupted(false);
     }, 2200);
 
-    // If recognition wasn't already active, start active listening immediately
-    if (isOpenRef.current && !processingRef.current && !speechService.isCurrentlyListening()) {
-      startBotListening(false);
-    }
+    // Wait 250ms for speaker hardware buffer to flush completely before opening microphone
+    postSpeechCooldownTimerRef.current = window.setTimeout(() => {
+      isSettlingRef.current = false;
+      setIsSettlingAfterSpeech(false);
+      if (isOpenRef.current && !processingRef.current && !isSpeakingRef.current) {
+        startBotListening(false);
+      }
+    }, 250);
   };
 
   // Register interruption handler with speechService while assistant is open
@@ -256,47 +311,224 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     };
   }, [isOpen, currentLang]);
 
-  // Teardown speech on unmount
+  // Teardown speech and audio analyser on unmount
   useEffect(() => {
     return () => {
-      if (bargeInTimerRef.current) window.clearTimeout(bargeInTimerRef.current);
+      clearAllVoiceTimers();
       if (interruptBadgeTimerRef.current) window.clearTimeout(interruptBadgeTimerRef.current);
+      if (animFrameRef.current) window.cancelAnimationFrame(animFrameRef.current);
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
       speechService.setInterruptionHandler(null);
       speechService.interruptAndClearAudioBuffer(false);
       speechService.stopListening();
     };
   }, []);
 
-  // Start listening with optional keepSpeaking for barge-in while TTS is playing
-  const startBotListening = (keepSpeaking = false) => {
-    if (!isOpenRef.current || processingRef.current) return;
-
-    if (!keepSpeaking) {
-      speechService.interruptAndClearAudioBuffer(false);
-      setIsSpeaking(false);
+  // Real-time Dynamic Canvas Waveform Animation (Zero-contention with SpeechRecognition)
+  useEffect(() => {
+    if (!isOpen) {
+      if (animFrameRef.current) {
+        window.cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      return;
     }
 
+    let isCancelled = false;
+    let phase = 0;
+
+    const renderWaveform = () => {
+      if (isCancelled) return;
+      const canvas = waveformCanvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const dpr = window.devicePixelRatio || 1;
+          const rect = canvas.getBoundingClientRect();
+          const width = rect.width || 320;
+          const height = rect.height || 44;
+
+          if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+            canvas.width = Math.floor(width * dpr);
+            canvas.height = Math.floor(height * dpr);
+          }
+
+          ctx.save();
+          ctx.scale(dpr, dpr);
+          ctx.clearRect(0, 0, width, height);
+
+          // Decay speech transcript boost smoothly
+          speechBoostRef.current = Math.max(0, speechBoostRef.current * 0.93);
+
+          const activeEnergy = isListening
+            ? Math.max(speechBoostRef.current * 0.85, 0.36 + Math.sin(phase * 1.7) * 0.14)
+            : isSpeaking
+            ? 0.58 + Math.sin(phase * 2.1) * 0.22
+            : isAiThinking || isSettlingAfterSpeech
+            ? 0.25
+            : 0.08;
+
+          const centerY = height / 2;
+          phase += isListening ? 0.15 + activeEnergy * 0.1 : isSpeaking ? 0.13 : 0.05;
+
+          // 1. Background subtle glow ribbon wave
+          ctx.beginPath();
+          for (let x = 0; x <= width; x += 3) {
+            const normX = x / width;
+            const envelope = Math.sin(normX * Math.PI);
+            const yOffset =
+              Math.sin(normX * 10 + phase) *
+              Math.cos(normX * 4 - phase * 0.6) *
+              (height * 0.36) *
+              activeEnergy *
+              envelope;
+            const y = centerY + yOffset;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = isListening
+            ? 'rgba(40, 125, 115, 0.28)'
+            : isSpeaking
+            ? 'rgba(36, 90, 145, 0.26)'
+            : 'rgba(148, 163, 184, 0.25)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // 2. Dynamic symmetric rounded frequency bars
+          const barCount = 30;
+          const totalGap = (barCount - 1) * 4;
+          const barWidth = Math.max(2.5, (width - 24 - totalGap) / barCount);
+          const startX = 12;
+
+          for (let i = 0; i < barCount; i++) {
+            const normIdx = i / (barCount - 1);
+            const centerWeight = Math.sin(normIdx * Math.PI);
+
+            let barMag = 0;
+            if (isListening || isSpeaking || isAiThinking || isSettlingAfterSpeech) {
+              const wave1 = Math.sin(phase * 1.4 + i * 0.55);
+              const wave2 = Math.cos(phase * 0.9 - i * 0.35);
+              barMag = (0.35 + 0.65 * Math.abs(wave1 * wave2)) * activeEnergy;
+            } else {
+              barMag = 0.08;
+            }
+
+            const barHeight = Math.max(
+              4,
+              Math.min(height - 6, barMag * (height - 6) * (0.45 + 0.55 * centerWeight))
+            );
+            const x = startX + i * (barWidth + 4);
+            const y = centerY - barHeight / 2;
+
+            // Color palette keyed to voice assistant state
+            if (isInterrupted) {
+              ctx.fillStyle = '#0D9488';
+            } else if (isListening) {
+              ctx.fillStyle = i % 2 === 0 ? '#287D73' : '#17365D';
+            } else if (isSpeaking) {
+              ctx.fillStyle = i % 2 === 0 ? '#245A91' : '#D9822B';
+            } else if (isAiThinking || isSettlingAfterSpeech) {
+              ctx.fillStyle = '#245A91';
+            } else {
+              ctx.fillStyle = '#CBD5E1';
+            }
+
+            ctx.beginPath();
+            ctx.roundRect(x, y, barWidth, barHeight, barWidth / 2);
+            ctx.fill();
+          }
+
+          ctx.restore();
+        }
+      }
+      animFrameRef.current = window.requestAnimationFrame(renderWaveform);
+    };
+
+    animFrameRef.current = window.requestAnimationFrame(renderWaveform);
+
+    return () => {
+      isCancelled = true;
+      if (animFrameRef.current) {
+        window.cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+    };
+  }, [isOpen, isListening, isSpeaking, isAiThinking, isSettlingAfterSpeech, isInterrupted]);
+
+  /**
+   * Starts microphone capture ONLY when bot speech output and post-speech cooldown are 100% finished.
+   */
+  const startBotListening = (_keepSpeaking = false) => {
+    if (!isOpenRef.current || processingRef.current) return;
+
+    // Never activate microphone if bot is still speaking or in post-speech cooldown
+    if (isSpeakingRef.current || isSettlingRef.current || speechService.isCurrentlySpeaking()) {
+      return;
+    }
+
+    if (finalSpeechDebounceTimerRef.current) {
+      window.clearTimeout(finalSpeechDebounceTimerRef.current);
+      finalSpeechDebounceTimerRef.current = null;
+    }
+    if (interimSilenceTimerRef.current) {
+      window.clearTimeout(interimSilenceTimerRef.current);
+      interimSilenceTimerRef.current = null;
+    }
+
+    setIsSpeaking(false);
+    setIsSettlingAfterSpeech(false);
     setIsListening(true);
     setLiveTranscript('');
 
     speechService.startListening(
       currentLang,
       (result: SpeechRecognitionResultWrapper) => {
+        // Strict non-overlap guard: ignore any mic input if bot is speaking or settling
+        if (
+          !isOpenRef.current ||
+          processingRef.current ||
+          isSpeakingRef.current ||
+          isSettlingRef.current ||
+          speechService.isCurrentlySpeaking()
+        ) {
+          return;
+        }
+
         const cleaned = speechService.deduplicateSpokenText(result.transcript, false);
         if (!cleaned) return;
 
-        // If AI was speaking when user started talking, trigger the interruption handler immediately
-        if (speechService.isCurrentlySpeaking() || isSpeaking) {
-          handleUserInterruption();
-        } else {
-          setIsSpeaking(false);
-          setIsListening(true);
-        }
-
+        setIsSpeaking(false);
+        setIsListening(true);
         setLiveTranscript(cleaned);
 
+        if (finalSpeechDebounceTimerRef.current) {
+          window.clearTimeout(finalSpeechDebounceTimerRef.current);
+          finalSpeechDebounceTimerRef.current = null;
+        }
+        if (interimSilenceTimerRef.current) {
+          window.clearTimeout(interimSilenceTimerRef.current);
+          interimSilenceTimerRef.current = null;
+        }
+
         if (result.isFinal && cleaned.trim()) {
-          processUserQuery(cleaned.trim());
+          finalSpeechDebounceTimerRef.current = window.setTimeout(() => {
+            if (isOpenRef.current && !processingRef.current && !isSpeakingRef.current) {
+              processUserQuery(cleaned.trim());
+            }
+          }, 550);
+        } else if (cleaned.trim()) {
+          interimSilenceTimerRef.current = window.setTimeout(() => {
+            if (isOpenRef.current && !processingRef.current && !isSpeakingRef.current) {
+              processUserQuery(cleaned.trim());
+            }
+          }, 1500);
         }
       },
       (_errorMsg: string) => {
@@ -304,55 +536,73 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
       },
       () => {
         setIsListening(false);
-      },
-      keepSpeaking
+      }
     );
   };
 
-  // Speak AI reply aloud, allow immediate barge-in while speaking, and auto-enable mic after speaking finishes
+  /**
+   * Speaks AI reply aloud with strict separation from input capture:
+   * 1. Immediately stops microphone capture before starting speech output.
+   * 2. Waits until speech synthesis has genuinely completed.
+   * 3. Enforces a dedicated post-speech acoustic settling cooldown (600ms) so the microphone
+   *    never activates prematurely while speaker audio is still decaying.
+   */
   const speakAndAutoListen = (spokenText: string) => {
-    if (bargeInTimerRef.current) {
-      window.clearTimeout(bargeInTimerRef.current);
-      bargeInTimerRef.current = null;
-    }
+    clearAllVoiceTimers();
 
+    // Ensure microphone is completely off before bot starts talking
+    speechService.stopListening();
+    isSpeakingRef.current = true;
+    isSettlingRef.current = false;
+    setIsListening(false);
+    setIsSettlingAfterSpeech(false);
     setIsInterrupted(false);
     setIsSpeaking(true);
 
-    // Enable background barge-in listening right after speech begins so user can interrupt anytime
-    bargeInTimerRef.current = window.setTimeout(() => {
-      if (isOpenRef.current && !processingRef.current) {
-        startBotListening(true);
-      }
-    }, 180);
-
     speechService.speak(spokenText, currentLang, () => {
-      setIsSpeaking(false);
-      if (bargeInTimerRef.current) {
-        window.clearTimeout(bargeInTimerRef.current);
-        bargeInTimerRef.current = null;
-      }
-      // Automatically turn on active microphone after bot finishes speaking
-      if (isOpenRef.current && !processingRef.current) {
-        window.setTimeout(() => {
-          if (isOpenRef.current && !processingRef.current) {
+      // Poll until browser speechSynthesis hardware is 100% finished speaking
+      const waitUntilSynthesisIdle = () => {
+        if (!isOpenRef.current || processingRef.current) {
+          isSpeakingRef.current = false;
+          isSettlingRef.current = false;
+          setIsSpeaking(false);
+          setIsSettlingAfterSpeech(false);
+          return;
+        }
+
+        if (
+          typeof window !== 'undefined' &&
+          (window.speechSynthesis?.speaking || speechService.isCurrentlySpeaking())
+        ) {
+          postSpeechCooldownTimerRef.current = window.setTimeout(waitUntilSynthesisIdle, 180);
+          return;
+        }
+
+        // Bot has finished speaking; enter post-speech acoustic cooldown before activating microphone
+        isSpeakingRef.current = false;
+        isSettlingRef.current = true;
+        setIsSpeaking(false);
+        setIsSettlingAfterSpeech(true);
+
+        postSpeechCooldownTimerRef.current = window.setTimeout(() => {
+          isSettlingRef.current = false;
+          setIsSettlingAfterSpeech(false);
+          if (isOpenRef.current && !processingRef.current && !isSpeakingRef.current) {
             startBotListening(false);
           }
-        }, 150);
-      }
+        }, 600);
+      };
+
+      waitUntilSynthesisIdle();
     });
   };
 
   const handleMicButtonTap = () => {
-    if (bargeInTimerRef.current) {
-      window.clearTimeout(bargeInTimerRef.current);
-      bargeInTimerRef.current = null;
-    }
+    clearAllVoiceTimers();
 
-    // If AI is speaking, tapping the mic invokes the interruption handler to stop playback, clear buffer, and listen
-    if (isSpeaking || speechService.isCurrentlySpeaking()) {
+    // If AI is speaking or in post-speech cooldown, tapping the mic interrupts and transitions cleanly to listening
+    if (isSpeaking || isSettlingAfterSpeech || speechService.isCurrentlySpeaking()) {
       handleUserInterruption();
-      startBotListening(false);
       return;
     }
 
@@ -370,12 +620,10 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     startBotListening(false);
   };
 
-  const handleToggleOpen = async () => {
+  const handleToggleOpen = () => {
     if (!isOpen) {
       setIsOpen(true);
       isOpenRef.current = true;
-
-      await speechService.requestMicrophonePermission();
 
       const greeting =
         currentLang === 'bho'
@@ -388,14 +636,14 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     } else {
       setIsOpen(false);
       isOpenRef.current = false;
-      if (bargeInTimerRef.current) {
-        window.clearTimeout(bargeInTimerRef.current);
-        bargeInTimerRef.current = null;
-      }
+      isSpeakingRef.current = false;
+      isSettlingRef.current = false;
+      clearAllVoiceTimers();
       speechService.interruptAndClearAudioBuffer(false);
       speechService.stopListening();
       setIsListening(false);
       setIsSpeaking(false);
+      setIsSettlingAfterSpeech(false);
       setIsInterrupted(false);
     }
   };
@@ -416,14 +664,14 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     if (processingRef.current || !queryText) return;
     processingRef.current = true;
 
-    if (bargeInTimerRef.current) {
-      window.clearTimeout(bargeInTimerRef.current);
-      bargeInTimerRef.current = null;
-    }
+    clearAllVoiceTimers();
     speechService.stopListening();
     speechService.stopSpeaking();
+    isSpeakingRef.current = false;
+    isSettlingRef.current = false;
     setIsListening(false);
     setIsSpeaking(false);
+    setIsSettlingAfterSpeech(false);
 
     // Add user query to chat history
     setChatHistory((prev) => [...prev, { sender: 'user', text: queryText }]);
@@ -436,8 +684,14 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
       normalizedQuery = cachedMatch.item.phrase;
     }
 
-    // Evaluate with local Indic & English intent engine
-    const localResult = processLocalAssistantQuery(normalizedQuery, currentView, currentLang, profile);
+    // Evaluate with local Indic & English intent engine using actual live locationData on screen
+    const localResult = processLocalAssistantQuery(
+      normalizedQuery,
+      currentView,
+      currentLang,
+      profile,
+      locationData
+    );
 
     let finalReply = localResult.reply;
     let spokenText = localResult.spokenReply;
@@ -448,15 +702,16 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
 
     voiceVocabularyCache.addPhrase(queryText, 'navigation', currentLang);
 
-    // If localResult matched a concrete app command (e.g., "रोडमैप पढ़ो", "नौकरी बताओ", "योजना पढ़ो", "ट्रेनिंग बताओ", page navigation, or profile update),
+    // If localResult matched a concrete app command (e.g., "रोडमैप पढ़ो", "नौकरी बताओ", "योजना पढ़ो", "सारा डेटा पढ़ो", page navigation, or profile update),
     // execute immediately with 0ms delay so card reading and voice actions always work reliably!
+    // Otherwise, route to live Gemini with full chatHistory & live screen locationData so it answers follow-up questions naturally.
     if (!localResult.matchedIntent) {
       setIsAiThinking(true);
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 14000);
 
-        const targetLocation = activeLocation || profile?.location || 'Maharajganj, Uttar Pradesh';
+        const targetLocation = activeLocation || profile?.location || locationData?.locationLabel || 'Maharajganj, Uttar Pradesh';
         const requestPayload = JSON.stringify({
           message: queryText,
           language: currentLang,
@@ -464,7 +719,35 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
           userProfile: {
             ...(profile || {}),
             location: targetLocation
-          }
+          },
+          chatHistory: chatHistory.slice(-10),
+          locationData: locationData
+            ? {
+                locationLabel: locationData.locationLabel,
+                district: locationData.district,
+                state: locationData.state,
+                opportunities: (locationData.opportunities || []).slice(0, 6).map((o) => ({
+                  title: o.title,
+                  org: o.org,
+                  pay: o.pay,
+                  loc: o.loc,
+                  distance: o.distance,
+                  req: o.req,
+                  tag: o.tag,
+                  contactPhone: o.contactPhone,
+                })),
+                trainingCenters: (locationData.trainingCenters || []).slice(0, 5).map((t) => ({
+                  title: t.title,
+                  org: t.org,
+                  pay: t.pay,
+                  loc: t.loc,
+                  distance: t.distance,
+                  req: t.req,
+                })),
+                schemes: (locationData.schemes || []).slice(0, 5),
+                insight: locationData.insight,
+              }
+            : null,
         });
 
         let response: Response | null = null;
@@ -520,7 +803,7 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
     setChatHistory((prev) => [...prev, { sender: 'ai', text: finalReply }]);
 
     if (isCardRead) {
-      setActionNotice(currentLang === 'en' ? '📖 Reading Card Aloud...' : '📖 कार्ड बोलकर सुनाया जा रहा है...');
+      setActionNotice(currentLang === 'en' ? '📖 Reading Screen Data Aloud...' : '📖 स्क्रीन का डेटा बोलकर सुनाया जा रहा है...');
       setTimeout(() => setActionNotice(null), 3500);
     } else if (targetView) {
       setActionNotice(currentLang === 'en' ? `🚀 Opening ${targetView}...` : `🚀 पेज खोला जा रहा है...`);
@@ -562,8 +845,9 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
 
     processingRef.current = false;
 
-    // Speak response aloud and automatically re-enable mic for continuous conversation
-    speakAndAutoListen(spokenText);
+    // Clean any markdown formatting symbols before speaking aloud and automatically re-enable mic
+    const cleanSpoken = spokenText.replace(/\*\*/g, '').replace(/[#•]/g, '').trim();
+    speakAndAutoListen(cleanSpoken);
   };
 
   const handleTextSubmit = (e: React.FormEvent) => {
@@ -746,6 +1030,14 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[11px] font-semibold no-scrollbar">
               <button
                 type="button"
+                onClick={() => processUserQuery(currentLang === 'en' ? 'Read All Screen Data' : 'सारा डेटा पढ़ो')}
+                className="px-2.5 py-1.5 rounded-xl bg-[#17365D]/10 text-[#17365D] hover:bg-[#17365D]/20 whitespace-nowrap border border-[#17365D]/25 flex items-center gap-1 transition-colors font-bold"
+              >
+                <Icon name="volume2" size={12} />
+                <span>{currentLang === 'en' ? 'Read Page Data' : 'सारा डेटा पढ़ो'}</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => processUserQuery(currentLang === 'en' ? 'Read Roadmap' : 'रोडमैप पढ़ो')}
                 className="px-2.5 py-1.5 rounded-xl bg-[#287D73]/10 text-[#287D73] hover:bg-[#287D73]/20 whitespace-nowrap border border-[#287D73]/25 flex items-center gap-1 transition-colors font-bold"
               >
@@ -786,27 +1078,73 @@ export const FloatingVoiceAssistant: React.FC<FloatingVoiceAssistantProps> = ({
               </button>
             </div>
 
-            {/* Primary Voice Mic Control */}
-            <button
-              type="button"
-              onClick={handleMicButtonTap}
-              className={`w-full py-3 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 ${
-                isListening
-                  ? 'bg-[#287D73] text-white ring-4 ring-[#287D73]/20'
-                  : isSpeaking
-                  ? 'bg-[#D9822B] text-white'
-                  : 'bg-gradient-to-r from-[#245A91] to-[#17365D] text-white hover:opacity-95'
-              }`}
-            >
-              <Icon name="mic" size={16} className={isListening ? 'animate-pulse' : ''} />
-              <span>
-                {isSpeaking
-                  ? 'बोल रहा है... (रोककर बोलने के लिए टैप करें या सीधे बोलें)'
-                  : isListening
-                  ? 'माइक चालू है - अभी बोलिए (सुन रहा हूँ...)'
-                  : 'बोलकर पूछें (Tap to Speak)'}
-              </span>
-            </button>
+            {/* Real-Time Dynamic Canvas Waveform Visualizer & Primary Voice Mic Control */}
+            <div className="rounded-2xl border border-[#DCE3EA] bg-white p-2 shadow-2xs space-y-1.5">
+              <div
+                onClick={handleMicButtonTap}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') handleMicButtonTap();
+                }}
+                className="relative w-full h-11 rounded-xl bg-gradient-to-r from-[#F8FAFC] via-[#EFF6FF] to-[#F0FDFA] border border-[#E2E8F0] overflow-hidden flex items-center justify-center cursor-pointer"
+                title={
+                  isListening
+                    ? 'आपकी आवाज़ की लाइव तरंगें (Speaking Waveform)'
+                    : 'बोलने के लिए टैप करें (Tap to Speak)'
+                }
+              >
+                <canvas
+                  ref={waveformCanvasRef}
+                  className="w-full h-full block"
+                  aria-label="Live Voice Waveform Visualizer"
+                />
+                <span className="absolute right-2.5 bottom-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/85 text-[#17365D] border border-[#DCE3EA] shadow-2xs pointer-events-none">
+                  {isListening
+                    ? 'LIVE MIC WAVE'
+                    : isSpeaking
+                    ? 'AI VOICE WAVE'
+                    : isSettlingAfterSpeech
+                    ? 'PREPARING MIC'
+                    : isAiThinking
+                    ? 'ANALYZING'
+                    : 'READY'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleMicButtonTap}
+                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 ${
+                  isListening
+                    ? 'bg-[#287D73] text-white ring-4 ring-[#287D73]/20'
+                    : isSpeaking
+                    ? 'bg-[#D9822B] text-white'
+                    : isSettlingAfterSpeech
+                    ? 'bg-[#245A91] text-white opacity-90'
+                    : 'bg-gradient-to-r from-[#245A91] to-[#17365D] text-white hover:opacity-95'
+                }`}
+              >
+                <Icon name="mic" size={16} className={isListening ? 'animate-pulse' : ''} />
+                <span>
+                  {isSpeaking
+                    ? currentLang === 'en'
+                      ? 'Speaking... (Tap to interrupt & speak)'
+                      : 'AI बोल रहा है... (रोककर बोलने के लिए टैप करें)'
+                    : isSettlingAfterSpeech
+                    ? currentLang === 'en'
+                      ? 'Speech finished — activating mic...'
+                      : 'आवाज़ पूरी हुई — माइक चालू हो रहा है...'
+                    : isListening
+                    ? currentLang === 'en'
+                      ? 'Mic is ON — Speak now'
+                      : 'माइक चालू है - अभी बोलिए (सुन रहा हूँ...)'
+                    : currentLang === 'en'
+                    ? 'Tap to Speak'
+                    : 'बोलकर पूछें (Tap to Speak)'}
+                </span>
+              </button>
+            </div>
 
             {/* Keyboard Input Form */}
             <form onSubmit={handleTextSubmit} className="flex items-center gap-2">

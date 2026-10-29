@@ -1,4 +1,4 @@
-import { AppView, BeneficiaryProfile, SupportedLanguage, Opportunity } from '../types';
+import { AppView, BeneficiaryProfile, SupportedLanguage, Opportunity, LocationLivelihoodData } from '../types';
 import { PATHWAYS, JOBS, DEMO } from '../data/mockData';
 import { rankPaths, rankJobs, splitList } from './recommendationEngine';
 
@@ -21,27 +21,74 @@ function cleanQuery(text: string): string {
 }
 
 /**
- * Intelligent Multilingual NLP & Card Reader Engine for JeevikaAI
- * Understands Hindi (Devanagari), Hinglish, Bhojpuri, and English voice commands.
+ * Intelligent Multilingual NLP & Live Screen Data Reader Engine for JeevikaAI
+ * Reads actual present data from locationData & userProfile and supports natural conversational follow-ups.
  */
 export function processLocalAssistantQuery(
   rawQuery: string,
   currentView: AppView,
   currentLang: SupportedLanguage,
-  userProfile: BeneficiaryProfile | null
+  userProfile: BeneficiaryProfile | null,
+  locationData?: LocationLivelihoodData | null
 ): AssistantEngineResult {
   const query = cleanQuery(rawQuery);
   const profile: BeneficiaryProfile = userProfile || DEMO;
   const isBhojpuri = currentLang === 'bho';
   const isEnglish = currentLang === 'en';
-  const userLoc = profile.location || 'Maharajganj, Uttar Pradesh';
+  const userLoc = locationData?.location || profile.location || 'Maharajganj, Uttar Pradesh';
 
   // Calculate current ranked pathways and jobs based on profile
   const rankedPathways = rankPaths(profile);
   const topPathway = rankedPathways[0] || PATHWAYS[0];
   const rankedOpportunities = rankJobs(profile, rankedPathways);
 
-  // Common read / explain / tell verbs in Devanagari, Hinglish, Bhojpuri, and English
+  // Live opportunities, training centers, and schemes currently present on the user's screen
+  const liveJobs: Opportunity[] =
+    locationData?.opportunities && locationData.opportunities.length > 0
+      ? locationData.opportunities
+      : rankedOpportunities.filter((j) => j.type !== 'Training');
+
+  const liveTrainingCenters: Opportunity[] =
+    locationData?.trainingCenters && locationData.trainingCenters.length > 0
+      ? locationData.trainingCenters
+      : JOBS.filter((j) => j.type === 'Training');
+
+  const liveSchemes = locationData?.schemes && locationData.schemes.length > 0 ? locationData.schemes : null;
+
+  // Detect conversational follow-up questions that should be answered by Live Gemini AI with chat history
+  const isConversationalFollowUp =
+    (query.includes('kaise') ||
+      query.includes('कैसे') ||
+      query.includes('kab') ||
+      query.includes('कब') ||
+      query.includes('kyu') ||
+      query.includes('क्यों') ||
+      query.includes('konsa') ||
+      query.includes('kaunsa') ||
+      query.includes('कौन सा') ||
+      query.includes('कौनसी') ||
+      query.includes('kitna') ||
+      query.includes('कितना') ||
+      query.includes('कितनी') ||
+      query.includes('apply') ||
+      query.includes('आवेदन कैसे') ||
+      query.includes('document') ||
+      query.includes('कागज') ||
+      query.includes('दस्तावेज') ||
+      query.includes('सलाह') ||
+      query.includes('advice') ||
+      query.includes('better') ||
+      query.includes('अच्छा रहेगा') ||
+      query.includes('बताओ इसके बारे में') ||
+      query.includes('और बताओ')) &&
+    !query.includes('पढ़ो') &&
+    !query.includes('padho') &&
+    !query.includes('सुनाओ') &&
+    !query.includes('sunao') &&
+    !query.includes('खोलो') &&
+    !query.includes('open');
+
+  // Common read / explain / tell verbs
   const isReadOrExplain =
     query.includes('padh') ||
     query.includes('padho') ||
@@ -65,13 +112,62 @@ export function processLocalAssistantQuery(
     query.includes('sunao') ||
     query.includes('सुनाओ') ||
     query.includes('सुनाईं') ||
-    query.includes('kya hai') ||
-    query.includes('क्या है') ||
     query.includes('details') ||
     query.includes('विवरण') ||
-    query.includes('जानकारी') ||
     query.includes('कार्ड') ||
     query.includes('card');
+
+  // -------------------------------------------------------------------------
+  // 0. "READ ALL DATA / READ CURRENT PAGE / SARA DATA PADHO"
+  // -------------------------------------------------------------------------
+  if (
+    query.includes('sara data') ||
+    query.includes('saara data') ||
+    query.includes('पूरा डेटा') ||
+    query.includes('सारा डेटा') ||
+    query.includes('सब कुछ पढ़ो') ||
+    query.includes('पूरा पेज') ||
+    query.includes('पेज पढ़ो') ||
+    query.includes('page padho') ||
+    query.includes('read all') ||
+    query.includes('read page') ||
+    query.includes('सब पढ़ो') ||
+    query.includes('सारा कार्ड')
+  ) {
+    const pName = topPathway.hi || topPathway.name;
+    const j1 = liveJobs[0];
+    const j2 = liveJobs[1];
+    const t1 = liveTrainingCenters[0];
+    const s1 = liveSchemes?.[0];
+
+    const reply =
+      `📋 **${userLoc} का संपूर्ण आजीविका डेटा सारांश:**\n\n` +
+      `• **आपकी प्रोफ़ाइल:** ${profile.name} (${profile.education || '10वीं पास'}) · हुनर: ${profile.skills || 'सिलाई व डिजिटल'}\n` +
+      `• **शीर्ष रोडमैप:** ${pName} (${topPathway.role}, NSQF स्तर ${topPathway.nsqf})\n` +
+      (j1
+        ? `• **प्रमुख नौकरियां:**\n  1. ${j1.title} (${j1.org}) — ${j1.pay} (${j1.loc}, ${j1.km || 4} km दूर)\n` +
+          (j2 ? `  2. ${j2.title} (${j2.org}) — ${j2.pay} (${j2.loc}, ${j2.km || 6} km दूर)\n` : '')
+        : '') +
+      (t1 ? `• **प्रमुख प्रशिक्षण केंद्र:** ${t1.title} (${t1.loc}, ${t1.km || 5} km दूर) — ${t1.pay}\n` : '') +
+      (s1 ? `• **प्रमुख सरकारी योजना:** ${s1.hiName || s1.name} — ${s1.benefit}` : '');
+
+    const spokenReply =
+      `${userLoc} के लिए आपके पेज का पूरा विवरण: आपकी प्रोफ़ाइल के अनुसार आपका मुख्य रोडमैप ${pName} है। ` +
+      (j1
+        ? `प्रमुख नौकरियों में पहला अवसर है ${j1.title}, संस्था ${j1.org}, वेतन ${j1.pay}, जो आपके स्थान से ${j1.km || 4} किलोमीटर दूर ${j1.loc} में है। `
+        : '') +
+      (j2 ? `दूसरा अवसर है ${j2.title}, वेतन ${j2.pay}। ` : '') +
+      (t1 ? `प्रशिक्षण केंद्र में ${t1.title} आपके स्थान से ${t1.km || 5} किलोमीटर दूर उपलब्ध है। ` : '') +
+      (s1 ? `साथ ही सरकारी योजनाओं में ${s1.hiName || s1.name} के अंतर्गत ${s1.benefit} उपलब्ध है।` : '');
+
+    return {
+      reply,
+      spokenReply,
+      targetView: null,
+      isCardReadout: true,
+      matchedIntent: true,
+    };
+  }
 
   // -------------------------------------------------------------------------
   // 1. CREATOR / IDENTITY INTENT
@@ -115,51 +211,39 @@ export function processLocalAssistantQuery(
     query.includes('करियर') ||
     query.includes('pathway') ||
     query.includes('मार्ग') ||
-    query.includes('रास्ता') ||
     query.includes('चरण') ||
     query.includes('stage') ||
     query.includes('stages') ||
     query.includes('kadam') ||
     query.includes('milestone');
 
-  if (isRoadmapQuery) {
+  if (isRoadmapQuery && !isConversationalFollowUp) {
     const pName = topPathway.hi || topPathway.name;
     const stage1 = topPathway.stages[0];
     const stage2 = topPathway.stages[1];
     const stage3 = topPathway.stages[2];
 
     const reply = isEnglish
-      ? `🗺️ **Livelihood Roadmap: ${topPathway.name}**\n\n` +
+      ? `🗺️ **Livelihood Roadmap: ${topPathway.name} (${userLoc})**\n\n` +
         `• **Target Role:** ${topPathway.role}\n` +
         `• **Duration:** ${topPathway.duration} (NSQF Level ${topPathway.nsqf})\n` +
-        `• **Estimated Earnings:** ₹8,000 to ₹15,000 / month\n\n` +
+        `• **Estimated Earnings:** ${locationData?.insight?.averageMonthlyWage || '₹8,000 to ₹15,000'} / month\n\n` +
         `**3 Learning Stages:**\n` +
         `1. **${stage1[0]}** (${stage1[2]}): ${stage1[1]}\n` +
         `2. **${stage2[0]}** (${stage2[2]}): ${stage2[1]}\n` +
         `3. **${stage3[0]}** (${stage3[2]}): ${stage3[1]}`
-      : isBhojpuri
-      ? `🗺️ **रउआ आजीविका रोडमैप: ${pName}**\n\n` +
-        `• **लक्ष्य काम:** ${topPathway.role}\n` +
-        `• **अवधि:** ${topPathway.duration} (NSQF लेवल ${topPathway.nsqf})\n` +
-        `• **अनुमानित कमाई:** ₹8,000 से ₹15,000 हर महीना\n\n` +
-        `**3 गो मुख्य चरण:**\n` +
-        `1. **${stage1[0]}** (${stage1[2]}): ${stage1[1]}\n` +
-        `2. **${stage2[0]}** (${stage2[2]}): ${stage2[1]}\n` +
-        `3. **${stage3[0]}** (${stage3[2]}): ${stage3[1]}`
-      : `🗺️ **आपका आजीविका रोडमैप: ${pName}**\n\n` +
+      : `🗺️ **आपका आजीविका रोडमैप: ${pName} (${userLoc})**\n\n` +
         `• **लक्ष्य कार्य:** ${topPathway.role}\n` +
         `• **अवधि:** ${topPathway.duration} (NSQF स्तर ${topPathway.nsqf})\n` +
-        `• **संभावित आय:** ₹8,000 से ₹15,000 प्रति माह\n\n` +
+        `• **संभावित मासिक आय:** ${locationData?.insight?.averageMonthlyWage || '₹8,000 से ₹15,000'}\n\n` +
         `**3 मुख्य चरण:**\n` +
         `1. **${stage1[0]}** (${stage1[2]}): ${stage1[1]}\n` +
         `2. **${stage2[0]}** (${stage2[2]}): ${stage2[1]}\n` +
         `3. **${stage3[0]}** (${stage3[2]}): ${stage3[1]}`;
 
     const spokenReply = isEnglish
-      ? `Here is your Roadmap for ${topPathway.name}. Your target role is ${topPathway.role}, duration ${topPathway.duration} at NSQF Level ${topPathway.nsqf}. Stage 1: ${stage1[0]}. Stage 2: ${stage2[0]}. Stage 3: ${stage3[0]}. You can earn ₹8,000 to ₹15,000 monthly.`
-      : isBhojpuri
-      ? `रउआ रोडमैप तैयार बा: रउआ खातिर सबसे बढ़िया रास्ता ${pName} बा। रउआ ${topPathway.role} बन सकेनी। एकर तीन गो चरण बा: पहिला, ${stage1[0]}। दूसरा, ${stage2[0]}। अउर तीसरा, ${stage3[0]}। रउआ ₹8,000 से ₹15,000 महीना कमा सकेनी।`
-      : `आपका आजीविका रोडमैप: आपकी प्रोफ़ाइल के अनुसार आपका शीर्ष मार्ग ${pName} है। इसमें आप ${topPathway.role} बन सकते हैं। इसके तीन चरण हैं: पहला चरण, ${stage1[0]}। दूसरा चरण, ${stage2[0]}। और तीसरा चरण, ${stage3[0]}। इससे आप ₹8,000 से ₹15,000 प्रति माह कमा सकते हैं।`;
+      ? `Here is your Roadmap for ${topPathway.name} in ${userLoc}. Your target role is ${topPathway.role}, duration ${topPathway.duration} at NSQF Level ${topPathway.nsqf}. Stage 1: ${stage1[0]}, ${stage1[1]}. Stage 2: ${stage2[0]}, ${stage2[1]}. Stage 3: ${stage3[0]}, ${stage3[1]}.`
+      : `आपका आजीविका रोडमैप (${userLoc}): आपकी प्रोफ़ाइल के अनुसार आपका शीर्ष मार्ग ${pName} है। इसमें आप ${topPathway.role} बन सकते हैं। इसके तीन चरण हैं: पहला चरण, ${stage1[0]} — ${stage1[1]}। दूसरा चरण, ${stage2[0]} — ${stage2[1]}। और तीसरा चरण, ${stage3[0]} — ${stage3[1]}। इससे आप महीने में ${locationData?.insight?.averageMonthlyWage || '₹8,000 से ₹15,000'} कमा सकते हैं।`;
 
     return {
       reply,
@@ -173,7 +257,7 @@ export function processLocalAssistantQuery(
   }
 
   // -------------------------------------------------------------------------
-  // 3. GOVERNMENT SCHEMES / YOJANA READER ("योजना पढ़ो", "सरकारी योजना बताओ")
+  // 3. GOVERNMENT SCHEMES / YOJANA READER (Reads actual live schemes from locationData)
   // -------------------------------------------------------------------------
   const isSchemeQuery =
     query.includes('yojana') ||
@@ -189,37 +273,40 @@ export function processLocalAssistantQuery(
     query.includes('मुद्रा') ||
     query.includes('odop') ||
     query.includes('subsidy') ||
-    query.includes('अनुदान') ||
-    query.includes('loan') ||
-    query.includes('लोन') ||
-    query.includes('ऋण');
+    query.includes('अनुदान');
 
-  if (isSchemeQuery) {
-    const reply = isEnglish
-      ? `🏛️ **Active Government Schemes for ${userLoc}:**\n\n` +
-        `1. **PM Vishwakarma Yojana**\n` +
-        `   • Benefit: ₹15,000 toolkit grant + ₹500/day training stipend + up to ₹3 Lakh loan at 5% interest.\n` +
-        `   • Apply at: Nearest CSC Center or Gram Panchayat.\n\n` +
-        `2. **One District One Product (ODOP) Scheme**\n` +
-        `   • Benefit: Up to ₹25,000 toolkit + margin money subsidy for local crafts.\n` +
-        `   • Apply at: District Industries Centre (DIC).\n\n` +
-        `3. **PM Mudra Yojana (Shishu / Kishore)**\n` +
-        `   • Benefit: Collateral-free business loan up to ₹50,000 (Shishu) to ₹5 Lakh.\n` +
-        `   • Apply at: Any nationalized bank branch (SBI, PNB, Baroda).`
-      : `🏛️ **${userLoc} के लिए प्रमुख सरकारी योजनाएं:**\n\n` +
-        `1. **प्रधानमंत्री विश्वकर्मा योजना:**\n` +
-        `   • लाभ: ₹15,000 टूलकिट अनुदान + ₹500/दिन प्रशिक्षण वजीफा + ₹3 लाख तक 5% ब्याज पर ऋण।\n` +
-        `   • आवेदन: नजदीकी CSC केंद्र या ग्राम पंचायत सचिवालय।\n\n` +
-        `2. **एक जिला एक उत्पाद (ODOP) योजना:**\n` +
-        `   • लाभ: ₹25,000 तक टूलकिट व व्यवसाय हेतु मार्जिन मनी सब्सिडी।\n` +
-        `   • आवेदन: जिला उद्योग प्रोत्साहन केंद्र (DIC)।\n\n` +
-        `3. **प्रधानमंत्री मुद्रा योजना (शिशु/किशोर):**\n` +
-        `   • लाभ: ₹50,000 से ₹5 लाख तक बिना गारंटी स्वरोजगार ऋण।\n` +
-        `   • आवेदन: किसी भी राष्ट्रीयकृत बैंक शाखा (SBI, PNB, Baroda) में।`;
+  if (isSchemeQuery && !isConversationalFollowUp) {
+    if (liveSchemes && liveSchemes.length > 0) {
+      const lines = liveSchemes.map(
+        (s, i) =>
+          `${i + 1}. **${s.hiName || s.name}**\n   • लाभ: ${s.benefit}\n   • पात्रता: ${s.eligibility}\n   • कहाँ आवेदन करें: ${s.applyOffice}`
+      );
+      const spokenLines = liveSchemes.map(
+        (s, i) =>
+          `योजना ${i + 1}: ${s.hiName || s.name}। इसका लाभ है: ${s.benefit}। पात्रता: ${s.eligibility}। आवेदन का स्थान: ${s.applyOffice}।`
+      );
 
-    const spokenReply = isEnglish
-      ? `Here are the top government schemes for ${userLoc}: First, PM Vishwakarma Yojana gives ₹15,000 toolkit grant and ₹500 daily training stipend; apply at your nearest CSC center. Second, ODOP scheme provides toolkit and margin money subsidy at the District Industries Centre. Third, PM Mudra Yojana offers up to ₹50,000 Shishu business loan at any bank branch.`
-      : `${userLoc} के लिए सरकारी योजनाएं: पहली है प्रधानमंत्री विश्वकर्मा योजना, जिसमें ₹15,000 टूलकिट अनुदान और ₹500 प्रतिदिन प्रशिक्षण वजीफा मिलता है, इसके लिए नजदीकी सीएससी केंद्र पर आवेदन करें। दूसरी है एक जिला एक उत्पाद योजना, जिसमें जिला उद्योग केंद्र से ₹25,000 तक टूलकिट और सब्सिडी मिलती है। तीसरी है प्रधानमंत्री मुद्रा योजना, जिसमें बैंक शाखा से ₹50,000 तक शिशु लोन बिना गारंटी मिलता है।`;
+      const reply = `🏛️ **${userLoc} के लिए सक्रिय सरकारी योजनाएं:**\n\n` + lines.join('\n\n');
+      const spokenReply = `${userLoc} के लिए आपकी स्क्रीन पर उपलब्ध सरकारी योजनाएं: ` + spokenLines.join(' ');
+
+      return {
+        reply,
+        spokenReply,
+        targetView: currentView === 'opportunities' ? 'opportunities' : 'dashboard',
+        actionHighlight: 'schemes-section',
+        isCardReadout: true,
+        matchedIntent: true,
+        cardType: 'scheme',
+      };
+    }
+
+    const reply =
+      `🏛️ **${userLoc} के लिए प्रमुख सरकारी योजनाएं:**\n\n` +
+      `1. **प्रधानमंत्री विश्वकर्मा योजना:** ₹15,000 टूलकिट अनुदान + ₹500/दिन प्रशिक्षण वजीफा + ₹3 लाख तक ऋण।\n` +
+      `2. **एक जिला एक उत्पाद (ODOP) योजना:** ₹25,000 तक टूलकिट व मार्जिन मनी सब्सिडी।\n` +
+      `3. **प्रधानमंत्री मुद्रा योजना:** ₹50,000 से ₹5 लाख तक बिना गारंटी स्वरोजगार ऋण।`;
+
+    const spokenReply = `${userLoc} के लिए सरकारी योजनाएं: पहली है प्रधानमंत्री विश्वकर्मा योजना, जिसमें ₹15,000 टूलकिट अनुदान और ₹500 प्रतिदिन वजीफा मिलता है। दूसरी है एक जिला एक उत्पाद योजना, और तीसरी है प्रधानमंत्री मुद्रा योजना।`;
 
     return {
       reply,
@@ -233,7 +320,7 @@ export function processLocalAssistantQuery(
   }
 
   // -------------------------------------------------------------------------
-  // 4. JOBS / NAUKARI CARD READER & NAVIGATION ("नौकरी पढ़ो", "काम बताओ", "रोजगार खोलो")
+  // 4. JOBS / NAUKARI CARD READER & NAVIGATION (Reads actual live jobs from locationData)
   // -------------------------------------------------------------------------
   const isJobQuery =
     query.includes('naukri') ||
@@ -245,39 +332,40 @@ export function processLocalAssistantQuery(
     query.includes('जॉब') ||
     query.includes('रोजगार') ||
     query.includes('रोज़गार') ||
-    query.includes('kaam') ||
-    query.includes('काम') ||
     query.includes('vacancy') ||
-    query.includes('salary') ||
-    query.includes('vetan') ||
     query.includes('वेतन') ||
     query.includes('अवसर');
 
-  if (isJobQuery) {
-    const isSolar = query.includes('solar') || query.includes('सोलर');
-    const isRetail = query.includes('retail') || query.includes('रिटेल') || query.includes('dukaan') || query.includes('दुकान');
-    const isTailor = query.includes('tailor') || query.includes('silai') || query.includes('सिलाई');
-    const isDigital = query.includes('digital') || query.includes('typing') || query.includes('डाटा एंट्री') || query.includes('डिजिटल');
-
+  if (isJobQuery && !isConversationalFollowUp) {
     let specificJob: Opportunity | undefined;
-    if (isSolar) specificJob = JOBS.find((j) => j.path === 'solar');
-    else if (isRetail) specificJob = JOBS.find((j) => j.path === 'retail');
-    else if (isTailor) specificJob = JOBS.find((j) => j.path === 'tailoring');
-    else if (isDigital) specificJob = JOBS.find((j) => j.path === 'digital');
-    else if (query.includes('first') || query.includes('pehli') || query.includes('पहली')) specificJob = rankedOpportunities[0];
+    if (query.includes('first') || query.includes('pehla') || query.includes('pehli') || query.includes('पहला') || query.includes('पहली')) {
+      specificJob = liveJobs[0];
+    } else if (query.includes('second') || query.includes('dusra') || query.includes('dusri') || query.includes('दूसरा') || query.includes('दूसरी')) {
+      specificJob = liveJobs[1];
+    } else if (query.includes('third') || query.includes('teesra') || query.includes('तीसरा') || query.includes('तीसरी')) {
+      specificJob = liveJobs[2];
+    } else if (query.includes('solar') || query.includes('सोलर')) {
+      specificJob = liveJobs.find((j) => j.path === 'solar' || j.title.toLowerCase().includes('solar'));
+    } else if (query.includes('retail') || query.includes('रिटेल') || query.includes('दुकान')) {
+      specificJob = liveJobs.find((j) => j.path === 'retail' || j.title.toLowerCase().includes('retail'));
+    } else if (query.includes('tailor') || query.includes('सिलाई')) {
+      specificJob = liveJobs.find((j) => j.path === 'tailoring' || j.title.toLowerCase().includes('tailor'));
+    } else if (query.includes('digital') || query.includes('कंप्यूटर') || query.includes('डिजिटल') || query.includes('csc')) {
+      specificJob = liveJobs.find((j) => j.path === 'digital' || j.title.toLowerCase().includes('digital') || j.title.toLowerCase().includes('csc'));
+    }
 
     if (specificJob) {
       const reply =
-        `💼 **नौकरी विवरण: ${specificJob.title}**\n\n` +
+        `💼 **नौकरी कार्ड विवरण: ${specificJob.title}**\n\n` +
         `• **संस्था:** ${specificJob.org}\n` +
-        `• **वेतन:** ${specificJob.pay}\n` +
-        `• **स्थान:** ${specificJob.loc}\n` +
+        `• **वेतन / आय:** ${specificJob.pay}\n` +
+        `• **स्थान व दूरी:** ${specificJob.loc} (आपके स्थान से ${specificJob.km || 4} km दूर)\n` +
         `• **योग्यता:** ${specificJob.eligibility}\n` +
-        `• **दस्तावेज़:** ${(specificJob.documentsRequired || ['आधार कार्ड']).join(', ')}`;
+        `• **आवश्यक दस्तावेज़:** ${(specificJob.documentsRequired || ['आधार कार्ड']).join(', ')}\n` +
+        `• **संपर्क:** ${specificJob.contactInfo || specificJob.loc}`;
 
-      const spokenReply = isEnglish
-        ? `Job details for ${specificJob.title} at ${specificJob.org}: Pay is ${specificJob.pay}, located at ${specificJob.loc}. Eligibility: ${specificJob.eligibility}.`
-        : `नौकरी विवरण: पद है ${specificJob.title}, संस्था ${specificJob.org}। मासिक वेतन ${specificJob.pay} है। स्थान ${specificJob.loc} है। योग्यता: ${specificJob.eligibility}।`;
+      const spokenReply =
+        `नौकरी कार्ड विवरण: पद है ${specificJob.title}, संस्था ${specificJob.org}। इसमें वेतन ${specificJob.pay} है। यह आपके स्थान से लगभग ${specificJob.km || 4} किलोमीटर दूर ${specificJob.loc} में स्थित है। योग्यता: ${specificJob.eligibility}। आवश्यक दस्तावेज़: ${(specificJob.documentsRequired || ['आधार कार्ड']).join(', ')}।`;
 
       return {
         reply,
@@ -290,26 +378,21 @@ export function processLocalAssistantQuery(
       };
     }
 
-    const topJobs = rankedOpportunities.filter((j) => j.type !== 'Training').slice(0, 3);
-    const j1 = topJobs[0] || JOBS[0];
-    const j2 = topJobs[1] || JOBS[1];
-    const j3 = topJobs[2] || JOBS[3];
+    const topJobs = liveJobs.slice(0, 4);
+    const jobLines = topJobs.map(
+      (j, idx) =>
+        `${idx + 1}. **${j.title}** (${j.org})\n   • वेतन: ${j.pay} · 📍 ${j.loc} (${j.km || 4} km दूर)\n   • योग्यता: ${j.eligibility}`
+    );
+    const spokenJobLines = topJobs.map(
+      (j, idx) =>
+        `अवसर ${idx + 1}: ${j.title}, संस्था ${j.org}, वेतन ${j.pay}, स्थान ${j.loc} जो आपसे ${j.km || 4} किलोमीटर दूर है।`
+    );
 
-    const reply = isEnglish
-      ? `💼 **Matched Jobs for Your Profile (${userLoc}):**\n\n` +
-        `1. **${j1.title}** (${j1.org}) — ${j1.pay}\n` +
-        `2. **${j2.title}** (${j2.org}) — ${j2.pay}\n` +
-        `3. **${j3.title}** (${j3.org}) — ${j3.pay}`
-      : `💼 **आपके प्रोफाइल के अनुसार प्रमुख रोजगार अवसर (${userLoc}):**\n\n` +
-        `1. **${j1.title}** (${j1.org})\n   • वेतन: ${j1.pay} · स्थान: ${j1.loc}\n` +
-        `2. **${j2.title}** (${j2.org})\n   • वेतन: ${j2.pay} · स्थान: ${j2.loc}\n` +
-        `3. **${j3.title}** (${j3.org})\n   • वेतन: ${j3.pay} · स्थान: ${j3.loc}`;
-
-    const spokenReply = isEnglish
-      ? `Here are the top matched jobs near you: First, ${j1.title} at ${j1.org}, paying ${j1.pay}. Second, ${j2.title}, paying ${j2.pay}. Third, ${j3.title}, paying ${j3.pay}. Opening the opportunities page now.`
-      : isBhojpuri
-      ? `रउआ खातिर मुख्य रोजगार अवसर: पहिला बा ${j1.title}, वेतन ${j1.pay}। दूसरा बा ${j2.title}, वेतन ${j2.pay}। अउर तीसरा बा ${j3.title}। रोजगार पेज खोलल जा रहल बा।`
-      : `आपके लिए प्रमुख रोजगार अवसर: पहला है ${j1.title}, वेतन ${j1.pay}। दूसरा है ${j2.title}, वेतन ${j2.pay}। और तीसरा है ${j3.title}, वेतन ${j3.pay}। मैं रोजगार अवसर पेज खोल रहा हूँ।`;
+    const reply = `💼 **${userLoc} में उपलब्ध प्रमुख रोजगार अवसर (${topJobs.length} कार्ड):**\n\n` + jobLines.join('\n\n');
+    const spokenReply =
+      `${userLoc} में आपके लिए उपलब्ध प्रमुख रोजगार अवसर: ` +
+      spokenJobLines.join(' ') +
+      ` आप किसी भी कार्ड पर टैप करके इन-बिल्ट मैप और रास्ता देख सकते हैं।`;
 
     return {
       reply,
@@ -334,12 +417,9 @@ export function processLocalAssistantQuery(
     query.includes('hunar') ||
     query.includes('gap') ||
     query.includes('अंतर') ||
-    query.includes('antar') ||
-    query.includes('seekhna') ||
-    query.includes('sikhna') ||
-    query.includes('सीखना');
+    query.includes('antar');
 
-  if (isSkillQuery) {
+  if (isSkillQuery && !isConversationalFollowUp) {
     const userSkills = splitList(profile.skills).map((s) => s.toLowerCase());
     const matchedSkills: string[] = [];
     const gapSkills: string[] = [];
@@ -357,19 +437,13 @@ export function processLocalAssistantQuery(
     const displayMatched = profile.skills || (matchedSkills.length > 0 ? matchedSkills.join(', ') : 'बुनियादी बातचीत, फोन का उपयोग');
     const displayGap = gapSkills.length > 0 ? gapSkills.slice(0, 3).join(', ') : 'व्यावसायिक उपकरण संचालन, डिजिटल फॉर्म';
 
-    const reply = isEnglish
-      ? `⚡ **Skill-Gap Analysis: ${topPathway.name}**\n\n` +
-        `• **Current Skills:** ${displayMatched}\n` +
-        `• **Skills to Learn:** ${displayGap}\n` +
-        `• **Recommended Step:** 2–3 months free PMKVY / RSETI certification course.`
-      : `⚡ **कौशल अंतर (Skill-Gap) विश्लेषण: ${topPathway.hi || topPathway.name}**\n\n` +
-        `• **आपके मौजूदा हुनर:** ${displayMatched}\n` +
-        `• **जो कौशल आगे सीखने हैं:** ${displayGap}\n` +
-        `• **सुझाव:** PMKVY या RSETI केंद्र से निःशुल्क प्रशिक्षण प्राप्त करें।`;
+    const reply =
+      `⚡ **कौशल अंतर (Skill-Gap) विश्लेषण: ${topPathway.hi || topPathway.name}**\n\n` +
+      `• **आपके मौजूदा हुनर:** ${displayMatched}\n` +
+      `• **जो कौशल आगे सीखने हैं:** ${displayGap}\n` +
+      `• **सुझाव:** ${userLoc} के नजदीकी PMKVY या RSETI केंद्र से निःशुल्क प्रशिक्षण प्राप्त करें।`;
 
-    const spokenReply = isEnglish
-      ? `Your current skills are ${displayMatched}. For ${topPathway.name}, learning ${displayGap} will boost your income. Opening your Skill Gap page now.`
-      : `आपके पास अभी ${displayMatched} का हुनर है। ${topPathway.hi || topPathway.name} में आगे बढ़ने के लिए आपको ${displayGap} सीखना चाहिए। कौशल विश्लेषण पेज खोला जा रहा है।`;
+    const spokenReply = `आपके पास अभी ${displayMatched} का हुनर है। ${topPathway.hi || topPathway.name} में आगे बढ़ने के लिए आपको ${displayGap} सीखना चाहिए। कौशल विश्लेषण पेज खोला जा रहा है।`;
 
     return {
       reply,
@@ -382,7 +456,7 @@ export function processLocalAssistantQuery(
   }
 
   // -------------------------------------------------------------------------
-  // 6. TRAINING CENTERS READER & NAVIGATION ("ट्रेनिंग पढ़ो", "प्रशिक्षण केंद्र बताओ")
+  // 6. TRAINING CENTERS READER & NAVIGATION (Reads actual live training centers from locationData)
   // -------------------------------------------------------------------------
   const isTrainingQuery =
     query.includes('training') ||
@@ -390,6 +464,7 @@ export function processLocalAssistantQuery(
     query.includes('ट्रेनिंग') ||
     query.includes('प्रशिक्षण') ||
     query.includes('prashikshan') ||
+    query.includes('परिचरण') ||
     query.includes('kendra') ||
     query.includes('केंद्र') ||
     query.includes('center') ||
@@ -398,26 +473,24 @@ export function processLocalAssistantQuery(
     query.includes('rseti') ||
     query.includes('iti') ||
     query.includes('course') ||
-    query.includes('कोर्स') ||
-    query.includes('सिलाई सीख') ||
-    query.includes('कंप्यूटर सीख');
+    query.includes('कोर्स');
 
-  if (isTrainingQuery) {
-    const trainingJobs = JOBS.filter((j) => j.type === 'Training');
-    const t1 = trainingJobs[0] || JOBS[7];
-    const t2 = trainingJobs[1] || JOBS[8];
+  if (isTrainingQuery && !isConversationalFollowUp) {
+    const centers = liveTrainingCenters.slice(0, 4);
+    const centerLines = centers.map(
+      (t, idx) =>
+        `${idx + 1}. **${t.title}** (${t.org})\n   • सुविधा: ${t.pay}\n   • स्थान: 📍 ${t.loc} (आपके स्थान से ${t.km || 6} km दूर)\n   • पात्रता: ${t.eligibility}`
+    );
+    const spokenCenterLines = centers.map(
+      (t, idx) =>
+        `केंद्र ${idx + 1}: ${t.title}, संस्था ${t.org}। सुविधा: ${t.pay}। यह आपके स्थान से ${t.km || 6} किलोमीटर दूर ${t.loc} में स्थित है।`
+    );
 
-    const reply = isEnglish
-      ? `🎓 **Free Government Skill Training Centers (${userLoc}):**\n\n` +
-        `1. **${t1.title}** (${t1.org})\n   • Benefit: ${t1.pay}\n` +
-        `2. **${t2.title}** (${t2.org})\n   • Benefit: ${t2.pay}`
-      : `🎓 **निःशुल्क सरकारी कौशल प्रशिक्षण केंद्र (${userLoc}):**\n\n` +
-        `1. **${t1.title}** (${t1.org})\n   • लाभ: ${t1.pay}\n` +
-        `2. **${t2.title}** (${t2.org})\n   • लाभ: ${t2.pay}`;
-
-    const spokenReply = isEnglish
-      ? `Here are the free government training centers near you: First, ${t1.title}, offering free training and certificate. Second, ${t2.title}, offering free residential self-employment training. Opening the training page now.`
-      : `आपके नजदीकी सरकारी प्रशिक्षण केंद्र: पहला है ${t1.title}, जहाँ मुफ्त ट्रेनिंग और सर्टिफिकेट मिलता है। दूसरा है ${t2.title}, जहाँ स्वरोजगार के लिए निःशुल्क प्रशिक्षण और टूलकिट सहायता मिलती है। प्रशिक्षण पेज खोला जा रहा है।`;
+    const reply = `🎓 **${userLoc} के प्रमाणित सरकारी प्रशिक्षण केंद्र (${centers.length} केंद्र):**\n\n` + centerLines.join('\n\n');
+    const spokenReply =
+      `${userLoc} में आपके नजदीकी सरकारी प्रशिक्षण केंद्र: ` +
+      spokenCenterLines.join(' ') +
+      ` प्रशिक्षण केंद्र पेज खोला जा रहा है।`;
 
     return {
       reply,
@@ -430,7 +503,7 @@ export function processLocalAssistantQuery(
   }
 
   // -------------------------------------------------------------------------
-  // 7. CONTEXTUAL "YEH CARD PADHO" / "READ THIS PAGE"
+  // 7. CONTEXTUAL "YEH CARD PADHO" / "FIRST CARD PADHO"
   // -------------------------------------------------------------------------
   if (
     query.includes('iss card') ||
@@ -441,29 +514,26 @@ export function processLocalAssistantQuery(
     query.includes('card padho') ||
     query.includes('कार्ड पढ़ो') ||
     query.includes('यह पढ़ो') ||
-    query.includes('इसे पढ़ो')
+    query.includes('इसे पढ़ो') ||
+    query.includes('पहला कार्ड') ||
+    query.includes('दूसरा कार्ड')
   ) {
     if (currentView === 'opportunities') {
-      return processLocalAssistantQuery('job card padho', currentView, currentLang, userProfile);
+      return processLocalAssistantQuery(`नौकरी ${rawQuery}`, currentView, currentLang, userProfile, locationData);
     } else if (currentView === 'training') {
-      return processLocalAssistantQuery('training card padho', currentView, currentLang, userProfile);
+      return processLocalAssistantQuery(`प्रशिक्षण केंद्र ${rawQuery}`, currentView, currentLang, userProfile, locationData);
     } else if (currentView === 'skill-gap') {
-      return processLocalAssistantQuery('skill card padho', currentView, currentLang, userProfile);
+      return processLocalAssistantQuery('कौशल कार्ड पढ़ो', currentView, currentLang, userProfile, locationData);
     }
-    return processLocalAssistantQuery('roadmap card padho', currentView, currentLang, userProfile);
+    return processLocalAssistantQuery('रोडमैप पढ़ो', currentView, currentLang, userProfile, locationData);
   }
 
   // -------------------------------------------------------------------------
   // 8. DIRECT PAGE NAVIGATION INTENTS
   // -------------------------------------------------------------------------
-  if (
-    query.includes('dashboard') ||
-    query.includes('डैशबोर्ड')
-  ) {
+  if (query.includes('dashboard') || query.includes('डैशबोर्ड')) {
     const text = isEnglish
       ? 'Opening your livelihood dashboard now.'
-      : isBhojpuri
-      ? 'रउआ खातिर आजीविका डैशबोर्ड खोलल जा रहल बा।'
       : 'जी, आपका आजीविका डैशबोर्ड खोला जा रहा है।';
     return {
       reply: text,
@@ -501,23 +571,24 @@ export function processLocalAssistantQuery(
     query.includes('मेरी जानकारी') ||
     query.includes('मेरा ब्यौरा')
   ) {
-    const text = isEnglish
-      ? `Opening your profile. Name: ${profile.name || 'Beneficiary'}, Education: ${profile.education || '10th pass'}, Location: ${userLoc}.`
-      : `आपकी प्रोफ़ाइल खोली जा रही है। नाम: ${profile.name || 'लाभार्थी'}, शिक्षा: ${profile.education || '10वीं पास'}, स्थान: ${userLoc}।`;
+    const text =
+      `👤 **आपकी प्रोफ़ाइल का विवरण:**\n` +
+      `• नाम: ${profile.name || 'लाभार्थी'}\n` +
+      `• शिक्षा: ${profile.education || '10वीं पास'}\n` +
+      `• कौशल (Skills): ${profile.skills || 'सिलाई, डिजिटल'}\n` +
+      `• रुचि: ${profile.interests || 'स्वरोजगार'}\n` +
+      `• वर्तमान स्थान: ${userLoc}`;
+    const spoken = `आपकी प्रोफ़ाइल का विवरण: आपका नाम ${profile.name || 'लाभार्थी'} है, शिक्षा ${profile.education || '10वीं पास'}, हुनर ${profile.skills || 'सिलाई व डिजिटल'}, और वर्तमान स्थान ${userLoc} है।`;
     return {
       reply: text,
-      spokenReply: text,
+      spokenReply: spoken,
       targetView: 'profile',
       isCardReadout: isReadOrExplain,
       matchedIntent: true,
     };
   }
 
-  if (
-    query.includes('home') ||
-    query.includes('होम') ||
-    query.includes('मुख्य पृष्ठ')
-  ) {
+  if (query.includes('home') || query.includes('होम') || query.includes('मुख्य पृष्ठ')) {
     const text = isEnglish ? 'Opening the home page.' : 'जी, मुख्य पृष्ठ खोला जा रहा है।';
     return {
       reply: text,
@@ -532,7 +603,6 @@ export function processLocalAssistantQuery(
     query.includes('assessment') ||
     query.includes('मूल्यांकन') ||
     query.includes('नया टेस्ट') ||
-    query.includes('शुरू से') ||
     query.includes('फिर से जानकारी')
   ) {
     const text = isEnglish
@@ -547,12 +617,7 @@ export function processLocalAssistantQuery(
     };
   }
 
-  if (
-    query.includes('saved') ||
-    query.includes('shortlist') ||
-    query.includes('सहेजे') ||
-    query.includes('सेव')
-  ) {
+  if (query.includes('saved') || query.includes('shortlist') || query.includes('सहेजे') || query.includes('सेव')) {
     const text = isEnglish
       ? 'Opening your saved opportunities.'
       : 'जी, आपके सहेजे गए अवसर खोले जा रहे हैं।';
@@ -565,12 +630,7 @@ export function processLocalAssistantQuery(
     };
   }
 
-  if (
-    query.includes('help') ||
-    query.includes('faq') ||
-    query.includes('मदद') ||
-    query.includes('सहायता')
-  ) {
+  if (query.includes('help') || query.includes('faq') || query.includes('मदद') || query.includes('सहायता')) {
     const text = isEnglish
       ? 'Opening the Help and FAQ section.'
       : 'जी, सहायता और प्रश्नोत्तर अनुभाग खोला जा रहा है।';
@@ -609,14 +669,12 @@ export function processLocalAssistantQuery(
   }
 
   // -------------------------------------------------------------------------
-  // 10. OPEN-ENDED QUESTION FALLBACK (Will be answered by live Gemini API first)
+  // 10. OPEN-ENDED / CONVERSATIONAL FOLLOW-UP (Routed to Live Gemini API with chat history & screen data)
   // -------------------------------------------------------------------------
   const pName = topPathway.hi || topPathway.name;
   const fallbackReply = isEnglish
-    ? `Based on your profile in ${userLoc}, your top recommended pathway is ${topPathway.name} (${topPathway.role}). You can also explore free PMKVY/RSETI training and PM Vishwakarma schemes on your dashboard.`
-    : isBhojpuri
-    ? `${userLoc} में रउआ प्रोफ़ाइल के हिसाब से सबसे बढ़िया मार्ग ${pName} (${topPathway.role}) बा। रउआ डैशबोर्ड पर सरकारी योजना, ट्रेनिंग अउर रोजगार के पूरा जानकारी देख सकेनी।`
-    : `${userLoc} में आपकी प्रोफ़ाइल के अनुसार ${pName} (${topPathway.role}) एक बेहतरीन विकल्प है। इसके लिए आप नजदीकी PMKVY या RSETI केंद्र से निःशुल्क प्रशिक्षण और पीएम विश्वकर्मा व मुद्रा योजना का लाभ ले सकते हैं।`;
+    ? `Based on your profile in ${userLoc}, your top recommended pathway is ${topPathway.name} (${topPathway.role}). You also have ${liveJobs.length} job opportunities and ${liveTrainingCenters.length} training centers available nearby.`
+    : `${userLoc} में आपकी प्रोफ़ाइल के अनुसार ${pName} (${topPathway.role}) एक बेहतरीन विकल्प है। आपके पास ${liveJobs.length} स्थानीय रोजगार अवसर और ${liveTrainingCenters.length} सरकारी प्रशिक्षण केंद्र उपलब्ध हैं।`;
 
   return {
     reply: fallbackReply,

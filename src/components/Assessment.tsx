@@ -25,6 +25,17 @@ interface AssessmentProps {
   onResetAutoStart?: () => void;
 }
 
+const STEP_TITLES: Record<string, { hi: string; bho: string; en: string }> = {
+  name: { hi: 'आपका नाम', bho: 'रउआ नाम', en: 'Your Name' },
+  education: { hi: 'शिक्षा की जानकारी', bho: 'पढ़ाई-लिखाई', en: 'Education Level' },
+  skills: { hi: 'हुनर और कौशल', bho: 'हुनर अउर कौशल', en: 'Existing Skills' },
+  interests: { hi: 'काम में रुचि', bho: 'पसंदीदा काम', en: 'Work Interests' },
+  occupation: { hi: 'वर्तमान काम', bho: 'अभी के काम', en: 'Current Occupation' },
+  location: { hi: 'गाँव / शहर और जिला', bho: 'गाँव / शहर अउर जिला', en: 'Village / City & District' },
+  workType: { hi: 'काम का प्रकार', bho: 'काम के प्रकार', en: 'Preferred Work Type' },
+  mobility: { hi: 'काम के लिए दूरी', bho: 'काम खातिर दूरी', en: 'Travel Distance Preference' },
+};
+
 export const Assessment: React.FC<AssessmentProps> = ({
   initialProfile,
   currentLang,
@@ -62,7 +73,6 @@ export const Assessment: React.FC<AssessmentProps> = ({
   const [readbackText, setReadbackText] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
-  const [turnCounter, setTurnCounter] = useState<number>(0);
   const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
 
   const [consentGranted, setConsentGranted] = useState<boolean>(() => {
@@ -73,11 +83,11 @@ export const Assessment: React.FC<AssessmentProps> = ({
   // References to guarantee state consistency across async voice events
   const speechDebounceTimerRef = useRef<any>(null);
   const fallbackSilenceTimerRef = useRef<any>(null);
-  const bargeInListenerTimerRef = useRef<any>(null);
   const turnInProgressRef = useRef<boolean>(false);
   const activeStepRef = useRef<number>(-1);
   const profileRef = useRef<BeneficiaryProfile>(answers);
-  const conversationStateRef = useRef<ConversationState>(conversationState);
+  const currentLangRef = useRef<SupportedLanguage>(currentLang);
+  const prefetchedGpsRef = useRef<string>('');
 
   useEffect(() => {
     activeStepRef.current = currentStepIndex;
@@ -88,8 +98,41 @@ export const Assessment: React.FC<AssessmentProps> = ({
   }, [answers]);
 
   useEffect(() => {
-    conversationStateRef.current = conversationState;
-  }, [conversationState]);
+    currentLangRef.current = currentLang;
+  }, [currentLang]);
+
+  // Silently pre-fetch GPS location in the background so it is ready by Step 6 without interrupting speech
+  useEffect(() => {
+    let mounted = true;
+    locationIntelligenceService
+      .detectGpsLocation()
+      .then((res) => {
+        if (!mounted || !res?.location) return;
+        prefetchedGpsRef.current = res.location;
+        if (!profileRef.current.location) {
+          setAnswers((prev) => ({
+            ...prev,
+            location: res.location,
+            locationAccuracy: res.accuracyLevel,
+            locationConfidence: res.confidenceScore,
+            locationAccuracyMeters: res.accuracyMeters,
+          }));
+          profileRef.current = {
+            ...profileRef.current,
+            location: res.location,
+            locationAccuracy: res.accuracyLevel,
+            locationConfidence: res.confidenceScore,
+            locationAccuracyMeters: res.accuracyMeters,
+          };
+        }
+      })
+      .catch(() => {
+        // Ignore silent background GPS error
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Teardown speech and audio timers on unmount
   useEffect(() => {
@@ -98,51 +141,56 @@ export const Assessment: React.FC<AssessmentProps> = ({
       speechService.stopListening();
       if (speechDebounceTimerRef.current) clearTimeout(speechDebounceTimerRef.current);
       if (fallbackSilenceTimerRef.current) clearTimeout(fallbackSilenceTimerRef.current);
-      if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
     };
   }, []);
 
-  const hasAutoFetchedGpsRef = useRef<boolean>(false);
-
-  const getIntroGreeting = useCallback(() => {
-    if (currentLang === 'bho') {
+  const getIntroGreeting = useCallback((langOverride?: SupportedLanguage) => {
+    const lang = langOverride || currentLangRef.current;
+    if (lang === 'bho') {
       return 'प्रणाम! हम जीविका एआई हईं। रउआ खातिर सही ट्रेनिंग अउर काम के सुझाव देवे खातिर कुछ सवाल पूछब। का हमनी के शुरू कर सकीं?';
     }
-    if (currentLang === 'en') {
+    if (lang === 'en') {
       return 'Namaste! I am JeevikaAI. I will ask you a few quick questions to recommend the best training and livelihood options. Shall we begin?';
     }
-    if (currentLang === 'hin') {
+    if (lang === 'hin') {
       return 'Namaste! Main JeevikaAI hoon. Aapko sahi training aur kaam ke options suggest karne ke liye kuch sawal poochunga. Kya hum shuru kar sakte hain?';
     }
     return 'नमस्ते! मैं जीविका एआई हूँ। आपको सही ट्रेनिंग और काम के विकल्प बताने के लिए कुछ सवाल पूछूँगा। क्या हम शुरू कर सकते हैं?';
-  }, [currentLang]);
+  }, []);
 
   const getStepQuestionText = useCallback(
-    (stepIdx: number): string => {
-      if (stepIdx === -1) return getIntroGreeting();
+    (stepIdx: number, langOverride?: SupportedLanguage): string => {
+      const lang = langOverride || currentLangRef.current;
+      if (stepIdx === -1) return getIntroGreeting(lang);
       const s = STEPS[stepIdx];
       if (!s) return '';
-      return s.q[currentLang] || s.q.hi || s.q.en;
+      if (s.key === 'location' && (profileRef.current.location || prefetchedGpsRef.current)) {
+        const loc = profileRef.current.location || prefetchedGpsRef.current;
+        if (lang === 'bho') {
+          return `जीपीएस से रउआ स्थान ${loc} मिलल बा। अगर ई सही बा त आगे बढ़ीं, ना त आपन गाँव या जिला बोलीं।`;
+        }
+        if (lang === 'en') {
+          return `We detected your location as ${loc}. Say yes to continue, or speak your village or district name.`;
+        }
+        return `जीपीएस से आपका स्थान ${loc} मिला है। यदि यह सही है तो 'हाँ' बोलें, या अपना गाँव और जिला बोलें।`;
+      }
+      return s.q[lang] || s.q.hi || s.q.en;
     },
-    [currentLang, getIntroGreeting]
+    [getIntroGreeting]
   );
 
   /**
-   * Starts listening for a step.
-   * When `keepSpeaking` is true, listens in the background while the AI speaks
-   * so if the user already understands and speaks immediately, it captures right away!
+   * Starts listening for a step cleanly AFTER AI speech has finished.
    */
   const startListeningForStep = useCallback(
-    (stepIdx: number, keepSpeaking: boolean = false) => {
-      if (!keepSpeaking) {
-        setConversationState('listening');
-        speechService.stopSpeaking();
-      }
+    (stepIdx: number, langOverride?: SupportedLanguage) => {
+      const lang = langOverride || currentLangRef.current;
+      setConversationState('listening');
       setErrorMessage('');
       turnInProgressRef.current = false;
 
       speechService.startListening(
-        currentLang,
+        lang,
         (result: SpeechRecognitionResultWrapper) => {
           setErrorMessage('');
           setConversationState('listening');
@@ -160,51 +208,41 @@ export const Assessment: React.FC<AssessmentProps> = ({
         },
         () => {
           // Recognition ended
-        },
-        keepSpeaking
+        }
       );
     },
-    [currentLang]
+    []
   );
 
   // Start the automatic conversation loop
-  const startConversation = useCallback(async () => {
-    localStorage.setItem('jeevika_consent_given', 'true');
-    setConsentGranted(true);
-    setShowConsentModal(false);
-    setErrorMessage('');
+  const startConversation = useCallback(
+    async (langOverride?: SupportedLanguage) => {
+      const lang = langOverride || currentLangRef.current;
+      localStorage.setItem('jeevika_consent_given', 'true');
+      setConsentGranted(true);
+      setShowConsentModal(false);
+      setErrorMessage('');
 
-    await speechService.requestMicrophonePermission();
+      await speechService.requestMicrophonePermission();
 
-    speechService.stopListening();
-    speechService.stopSpeaking();
-    if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
+      speechService.stopListening();
+      speechService.stopSpeaking();
 
-    setCurrentStepIndex(-1);
-    activeStepRef.current = -1;
-    setConversationState('asking_question');
-    turnInProgressRef.current = false;
+      setCurrentStepIndex(-1);
+      activeStepRef.current = -1;
+      setConversationState('asking_question');
+      turnInProgressRef.current = false;
 
-    const greetingText = getIntroGreeting();
+      const greetingText = getIntroGreeting(lang);
 
-    // Open barge-in listener while AI is speaking so user can answer immediately
-    if (inputMode === 'voice') {
-      bargeInListenerTimerRef.current = setTimeout(() => {
-        if (activeStepRef.current === -1 && !turnInProgressRef.current) {
-          startListeningForStep(-1, true);
+      speechService.speak(greetingText, lang, () => {
+        if (inputMode === 'voice' && activeStepRef.current === -1 && !turnInProgressRef.current) {
+          startListeningForStep(-1, lang);
         }
-      }, 300);
-    }
-
-    speechService.speak(greetingText, currentLang, () => {
-      if (inputMode === 'voice' && activeStepRef.current === -1 && !turnInProgressRef.current) {
-        setConversationState('listening');
-        if (!speechService.isCurrentlyListening()) {
-          startListeningForStep(-1, false);
-        }
-      }
-    });
-  }, [currentLang, getIntroGreeting, inputMode, startListeningForStep]);
+      });
+    },
+    [getIntroGreeting, inputMode, startListeningForStep]
+  );
 
   useEffect(() => {
     if (autoStart) {
@@ -220,16 +258,16 @@ export const Assessment: React.FC<AssessmentProps> = ({
     }
   }, [autoStart, onResetAutoStart, startConversation]);
 
-  // Speak a question aloud and simultaneously allow immediate user barge-in speech
-  const askQuestionAloud = (stepIdx: number) => {
+  // Speak a question aloud and automatically open microphone once speaking finishes
+  const askQuestionAloud = (stepIdx: number, langOverride?: SupportedLanguage) => {
+    const lang = langOverride || currentLangRef.current;
     if (stepIdx >= STEPS.length) {
-      initiateReadbackSummary();
+      initiateReadbackSummary(lang);
       return;
     }
 
     if (speechDebounceTimerRef.current) clearTimeout(speechDebounceTimerRef.current);
     if (fallbackSilenceTimerRef.current) clearTimeout(fallbackSilenceTimerRef.current);
-    if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
 
     setCurrentStepIndex(stepIdx);
     activeStepRef.current = stepIdx;
@@ -244,35 +282,21 @@ export const Assessment: React.FC<AssessmentProps> = ({
     setErrorMessage('');
     setClarificationPrompt('');
 
-    const questionText = getStepQuestionText(stepIdx);
+    const questionText = getStepQuestionText(stepIdx, lang);
 
-    // Enable immediate barge-in listening while AI is speaking the question
-    if (inputMode === 'voice') {
-      bargeInListenerTimerRef.current = setTimeout(() => {
-        if (activeStepRef.current === stepIdx && !turnInProgressRef.current) {
-          startListeningForStep(stepIdx, true);
-        }
-      }, 300);
-    }
-
-    speechService.speak(questionText, currentLang, () => {
+    speechService.speak(questionText, lang, () => {
       if (inputMode === 'voice' && activeStepRef.current === stepIdx && !turnInProgressRef.current) {
-        setConversationState('listening');
-        if (!speechService.isCurrentlyListening()) {
-          startListeningForStep(stepIdx, false);
-        }
+        startListeningForStep(stepIdx, lang);
       }
     });
   };
 
   /**
-   * Handle speech results with barge-in, deduplication, and fast stability debouncing.
+   * Handle speech results with deduplication and smooth stability debouncing.
    */
   const handleSpeechResult = (result: SpeechRecognitionResultWrapper, stepIdx: number) => {
     if (turnInProgressRef.current || stepIdx !== activeStepRef.current) return;
 
-    // Stop AI speech immediately as soon as user speaks
-    speechService.stopSpeaking();
     setConversationState('listening');
 
     const isNameStep = stepIdx >= 0 && STEPS[stepIdx]?.key === 'name';
@@ -314,24 +338,40 @@ export const Assessment: React.FC<AssessmentProps> = ({
 
     if (speechDebounceTimerRef.current) clearTimeout(speechDebounceTimerRef.current);
     if (fallbackSilenceTimerRef.current) clearTimeout(fallbackSilenceTimerRef.current);
-    if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
 
     speechService.stopListening();
     speechService.stopSpeaking();
 
     setConversationState('processing_answer');
-    setTurnCounter((prev) => prev + 1);
 
+    const lang = currentLangRef.current;
     const isIntro = stepIdx === -1;
     const currentStepConfig = !isIntro ? STEPS[stepIdx] : null;
     const stepKey = isIntro ? 'intro' : currentStepConfig!.key;
-    const questionText = getStepQuestionText(stepIdx);
+    const questionText = getStepQuestionText(stepIdx, lang);
     const dedupedInput = speechService.deduplicateSpokenText(transcript, stepKey === 'name');
+
+    // Special check on location step: if GPS location was already pre-filled and user said "हाँ / सही है / ठीक है / yes"
+    if (stepKey === 'location' && (profileRef.current.location || prefetchedGpsRef.current)) {
+      const lowerIn = dedupedInput.toLowerCase();
+      const isConfirmingGps = ['हां', 'हाँ', 'सही', 'ठीक', 'जी', 'आगे', 'yes', 'ok', 'haan', 'sahi', 'theek', 'ha'].some(
+        (w) => lowerIn === w || lowerIn.startsWith(w + ' ')
+      );
+      if (isConfirmingGps) {
+        const confirmedLoc = profileRef.current.location || prefetchedGpsRef.current;
+        setAnswers((prev) => ({ ...prev, location: confirmedLoc }));
+        profileRef.current = { ...profileRef.current, location: confirmedLoc };
+        speechService.playAudioCue('success');
+        const nextStepIdx = stepIdx + 1;
+        askQuestionAloud(nextStepIdx, lang);
+        return;
+      }
+    }
 
     try {
       const aiResponse = await speechService.extractWithGemini(
         dedupedInput,
-        currentLang,
+        lang,
         stepKey,
         profileRef.current,
         questionText
@@ -344,20 +384,9 @@ export const Assessment: React.FC<AssessmentProps> = ({
         setConversationState('asking_question');
         turnInProgressRef.current = false;
 
-        if (inputMode === 'voice') {
-          bargeInListenerTimerRef.current = setTimeout(() => {
-            if (activeStepRef.current === stepIdx && !turnInProgressRef.current) {
-              startListeningForStep(stepIdx, true);
-            }
-          }, 300);
-        }
-
-        speechService.speak(aiResponse.clarificationQuestion, currentLang, () => {
+        speechService.speak(aiResponse.clarificationQuestion, lang, () => {
           if (inputMode === 'voice' && activeStepRef.current === stepIdx && !turnInProgressRef.current) {
-            setConversationState('listening');
-            if (!speechService.isCurrentlyListening()) {
-              startListeningForStep(stepIdx, false);
-            }
+            startListeningForStep(stepIdx, lang);
           }
         });
         return;
@@ -367,14 +396,14 @@ export const Assessment: React.FC<AssessmentProps> = ({
         if (aiResponse.recognizedIntent === 'start_negative') {
           setConversationState('idle');
           if (aiResponse.acknowledgment) {
-            speechService.speak(aiResponse.acknowledgment, currentLang);
+            speechService.speak(aiResponse.acknowledgment, lang);
           }
           turnInProgressRef.current = false;
           return;
         }
 
         speechService.playAudioCue('success');
-        askQuestionAloud(0);
+        askQuestionAloud(0, lang);
         return;
       }
 
@@ -394,7 +423,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
 
       const acknowledgment =
         aiResponse.acknowledgment ||
-        (currentLang === 'bho' ? 'नोट हो गइल।' : 'नोट कर लिया है।');
+        (lang === 'bho' ? 'नोट हो गइल।' : lang === 'en' ? 'Noted.' : 'नोट कर लिया है।');
 
       const nextStepIdx = stepIdx + 1;
 
@@ -406,35 +435,27 @@ export const Assessment: React.FC<AssessmentProps> = ({
         setHeardText('');
         setInterimText('');
 
-        const nextPrompt = `${acknowledgment} ${getStepQuestionText(nextStepIdx)}`;
+        const nextPrompt = `${acknowledgment} ${getStepQuestionText(nextStepIdx, lang)}`;
 
-        // Open barge-in listener for the next question right away
-        if (inputMode === 'voice') {
-          bargeInListenerTimerRef.current = setTimeout(() => {
-            if (activeStepRef.current === nextStepIdx && !turnInProgressRef.current) {
-              startListeningForStep(nextStepIdx, true);
-            }
-          }, 300);
-        }
-
-        speechService.speak(nextPrompt, currentLang, () => {
+        speechService.speak(nextPrompt, lang, () => {
           if (inputMode === 'voice' && activeStepRef.current === nextStepIdx && !turnInProgressRef.current) {
-            setConversationState('listening');
-            if (!speechService.isCurrentlyListening()) {
-              startListeningForStep(nextStepIdx, false);
-            }
+            startListeningForStep(nextStepIdx, lang);
           }
         });
       } else {
         setCurrentStepIndex(8);
         activeStepRef.current = 8;
         setConversationState('readback_review');
-        initiateReadbackSummary();
+        initiateReadbackSummary(lang);
       }
     } catch (err: any) {
       console.error('Processing error:', err);
       setConversationState('recoverable_error');
-      setErrorMessage('आवाज़ समझने में समस्या हुई। कृपया माइक दबाकर दोबारा बोलें।');
+      setErrorMessage(
+        lang === 'en'
+          ? 'Could not process voice. Please tap the mic and speak again.'
+          : 'आवाज़ समझने में समस्या हुई। कृपया माइक दबाकर दोबारा बोलें।'
+      );
       turnInProgressRef.current = false;
     }
   };
@@ -442,22 +463,22 @@ export const Assessment: React.FC<AssessmentProps> = ({
   /**
    * Read back important collected information before saving the confirmed profile.
    */
-  const initiateReadbackSummary = async () => {
+  const initiateReadbackSummary = async (langOverride?: SupportedLanguage) => {
+    const lang = langOverride || currentLangRef.current;
     if (speechDebounceTimerRef.current) clearTimeout(speechDebounceTimerRef.current);
     if (fallbackSilenceTimerRef.current) clearTimeout(fallbackSilenceTimerRef.current);
-    if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
 
     speechService.stopListening();
     activeStepRef.current = 999;
     setConversationState('readback_review');
 
-    const verbalSummary = await speechService.generateReadback(profileRef.current, currentLang);
+    const verbalSummary = await speechService.generateReadback(profileRef.current, lang);
     setReadbackText(verbalSummary);
 
-    speechService.speak(verbalSummary, currentLang, () => {
+    speechService.speak(verbalSummary, lang, () => {
       if (inputMode === 'voice') {
         speechService.startListening(
-          currentLang,
+          lang,
           (result: SpeechRecognitionResultWrapper) => {
             if (result.transcript && result.transcript.trim()) {
               handleConfirmAndGenerateRoadmap();
@@ -475,15 +496,14 @@ export const Assessment: React.FC<AssessmentProps> = ({
     speechService.stopListening();
     if (speechDebounceTimerRef.current) clearTimeout(speechDebounceTimerRef.current);
     if (fallbackSilenceTimerRef.current) clearTimeout(fallbackSilenceTimerRef.current);
-    if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
     turnInProgressRef.current = false;
     setConversationState('idle');
   };
 
   /**
    * Microphone Button Tap Handler:
-   * Fixes the bug where tapping the mic restarted from the beginning (-1).
-   * Now it always operates on the current step!
+   * - If AI is speaking (`asking_question`), tapping the mic immediately stops AI speech and opens the mic on the current step!
+   * - If already listening, processes captured text or restarts listening on the current step.
    */
   const handleMicButtonTap = async () => {
     if (conversationState === 'processing_answer') return;
@@ -496,10 +516,9 @@ export const Assessment: React.FC<AssessmentProps> = ({
     }
 
     // If AI is currently speaking, tapping the mic stops AI speech and immediately listens on the current step
-    if (conversationState === 'asking_question') {
+    if (conversationState === 'asking_question' || speechService.isCurrentlySpeaking()) {
       speechService.stopSpeaking();
-      if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
-      startListeningForStep(currentStepIndex, false);
+      startListeningForStep(currentStepIndex);
       return;
     }
 
@@ -509,14 +528,14 @@ export const Assessment: React.FC<AssessmentProps> = ({
       if (textToProcess) {
         dispatchAnswerProcessing(textToProcess, currentStepIndex);
       } else {
-        startListeningForStep(currentStepIndex, false);
+        startListeningForStep(currentStepIndex);
       }
       return;
     }
 
-    // If idle or recoverable_error on any step >= 0, resume listening on the current step (never reset to -1)
+    // If idle or recoverable_error on any step >= 0, resume listening on the current step
     await speechService.requestMicrophonePermission();
-    startListeningForStep(currentStepIndex, false);
+    startListeningForStep(currentStepIndex);
   };
 
   const handleReplayQuestion = () => {
@@ -529,13 +548,28 @@ export const Assessment: React.FC<AssessmentProps> = ({
     }
   };
 
+  // Language switcher handler inside Assessment: updates language & re-speaks active step in new language
+  const handleSelectLanguage = (newLang: SupportedLanguage) => {
+    currentLangRef.current = newLang;
+    onLanguageChange(newLang);
+
+    if (!showConsentModal) {
+      if (conversationState === 'readback_review' || conversationState === 'confirming_answer') {
+        initiateReadbackSummary(newLang);
+      } else if (currentStepIndex === -1) {
+        startConversation(newLang);
+      } else if (currentStepIndex >= 0 && currentStepIndex < STEPS.length) {
+        askQuestionAloud(currentStepIndex, newLang);
+      }
+    }
+  };
+
   // Step Back to previous question (Left bottom button)
   const handlePreviousStep = () => {
     speechService.stopSpeaking();
     speechService.stopListening();
     if (speechDebounceTimerRef.current) clearTimeout(speechDebounceTimerRef.current);
     if (fallbackSilenceTimerRef.current) clearTimeout(fallbackSilenceTimerRef.current);
-    if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
     turnInProgressRef.current = false;
 
     if (currentStepIndex > 0) {
@@ -564,11 +598,17 @@ export const Assessment: React.FC<AssessmentProps> = ({
   };
 
   const handleStartEditTranscript = () => {
-    setEditingTranscriptValue(
+    const rawVal =
       interimText ||
-        heardText ||
-        (currentStepIndex >= 0 ? (answers[STEPS[currentStepIndex].key] as string) || '' : '')
-    );
+      heardText ||
+      (currentStepIndex >= 0
+        ? speechService.localizeProfileValue(
+            STEPS[currentStepIndex].key,
+            (answers[STEPS[currentStepIndex].key] as string) || '',
+            currentLang
+          )
+        : '');
+    setEditingTranscriptValue(rawVal);
     setIsEditingTranscript(true);
     speechService.stopListening();
     speechService.stopSpeaking();
@@ -611,21 +651,27 @@ export const Assessment: React.FC<AssessmentProps> = ({
   const handleDetectLocationGps = async () => {
     if (isDetectingGps) return;
     setIsDetectingGps(true);
+    const lang = currentLangRef.current;
     onNotify(
-      currentLang === 'bho'
+      lang === 'bho'
         ? 'जीपीएस से रउआ सटीक गाँव/शहर अउर जिला खोजल जा रहल बा...'
-        : currentLang === 'en'
-        ? 'Auto-fetching your exact village/town and district via GPS...'
-        : 'जीपीएस द्वारा आपका सटीक गाँव/शहर और जिला स्वतः प्राप्त किया जा रहा है...'
+        : lang === 'en'
+        ? 'Fetching your exact village/town and district via GPS...'
+        : 'जीपीएस द्वारा आपका सटीक गाँव/शहर और जिला खोजा जा रहा है...'
     );
 
     try {
       const res = await locationIntelligenceService.detectGpsLocation();
       if (!res) {
-        onNotify('स्थान स्वतः प्राप्त नहीं हो सका। कृपया माइक से अपना गाँव/शहर और जिला बोलें।');
+        onNotify(
+          lang === 'en'
+            ? 'Could not auto-detect location. Please speak your village and district.'
+            : 'स्थान स्वतः प्राप्त नहीं हो सका। कृपया माइक से अपना गाँव/शहर और जिला बोलें।'
+        );
         return;
       }
 
+      prefetchedGpsRef.current = res.location;
       setAnswers((prev) => ({
         ...prev,
         location: res.location,
@@ -645,9 +691,9 @@ export const Assessment: React.FC<AssessmentProps> = ({
       onNotify(`📍 ${res.location} (${res.confidenceScore}%)`);
 
       const ackText =
-        currentLang === 'bho'
+        lang === 'bho'
           ? `रउआ स्थान मिल गइल: ${res.location}।`
-          : currentLang === 'en'
+          : lang === 'en'
           ? `Exact location detected: ${res.location}.`
           : `आपका सटीक स्थान मिल गया: ${res.location}।`;
 
@@ -661,50 +707,33 @@ export const Assessment: React.FC<AssessmentProps> = ({
         setConversationState('asking_question');
         turnInProgressRef.current = false;
 
-        const nextPrompt = `${ackText} ${getStepQuestionText(nextStepIdx)}`;
-        if (inputMode === 'voice') {
-          bargeInListenerTimerRef.current = setTimeout(() => {
-            if (activeStepRef.current === nextStepIdx && !turnInProgressRef.current) {
-              startListeningForStep(nextStepIdx, true);
-            }
-          }, 300);
-        }
-        speechService.speak(nextPrompt, currentLang, () => {
+        const nextPrompt = `${ackText} ${getStepQuestionText(nextStepIdx, lang)}`;
+        speechService.speak(nextPrompt, lang, () => {
           if (inputMode === 'voice' && activeStepRef.current === nextStepIdx && !turnInProgressRef.current) {
-            setConversationState('listening');
-            if (!speechService.isCurrentlyListening()) {
-              startListeningForStep(nextStepIdx, false);
-            }
+            startListeningForStep(nextStepIdx, lang);
           }
         });
       } else {
         setCurrentStepIndex(8);
         activeStepRef.current = 8;
         setConversationState('readback_review');
-        initiateReadbackSummary();
+        initiateReadbackSummary(lang);
       }
     } catch (err) {
       console.warn('GPS detection failed:', err);
-      onNotify('जीपीएस अनुमति नहीं मिली। कृपया अपना गाँव/शहर और जिला बोलकर बताएं।');
+      onNotify(
+        lang === 'en'
+          ? 'GPS permission denied. Please speak your village and district.'
+          : 'जीपीएस अनुमति नहीं मिली। कृपया अपना गाँव/शहर और जिला बोलकर बताएं।'
+      );
     } finally {
       setIsDetectingGps(false);
     }
   };
 
-  // Auto-trigger GPS fetch as soon as user reaches the location step
-  useEffect(() => {
-    if (currentStepIndex >= 0 && STEPS[currentStepIndex]?.key === 'location') {
-      if (!hasAutoFetchedGpsRef.current) {
-        hasAutoFetchedGpsRef.current = true;
-        handleDetectLocationGps();
-      }
-    }
-  }, [currentStepIndex]);
-
   const handleConfirmAndGenerateRoadmap = async () => {
     if (speechDebounceTimerRef.current) clearTimeout(speechDebounceTimerRef.current);
     if (fallbackSilenceTimerRef.current) clearTimeout(fallbackSilenceTimerRef.current);
-    if (bargeInListenerTimerRef.current) clearTimeout(bargeInListenerTimerRef.current);
 
     speechService.stopSpeaking();
     speechService.stopListening();
@@ -733,13 +762,25 @@ export const Assessment: React.FC<AssessmentProps> = ({
     profileRef.current = { ...DEMO };
     setCurrentStepIndex(STEPS.length - 1);
     setConversationState('confirming_answer');
-    onNotify('डेमो प्रोफाइल (सुनीता देवी) लोड हो गई है।');
+    onNotify(
+      currentLang === 'en'
+        ? 'Demo profile (Sunita Devi) loaded.'
+        : 'डेमो प्रोफाइल (सुनीता देवी) लोड हो गई है।'
+    );
   };
 
   const currentStepConfig: AssessmentStep | null =
     currentStepIndex >= 0 && currentStepIndex < STEPS.length ? STEPS[currentStepIndex] : null;
 
   const currentFieldVal = currentStepConfig ? (answers[currentStepConfig.key] as string) || '' : '';
+  const localizedCurrentFieldVal = currentStepConfig
+    ? speechService.localizeProfileValue(currentStepConfig.key, currentFieldVal, currentLang)
+    : '';
+
+  const stepHeaderTitle = currentStepConfig
+    ? STEP_TITLES[currentStepConfig.key]?.[currentLang === 'bho' ? 'bho' : currentLang === 'en' ? 'en' : 'hi'] ||
+      currentStepConfig.label
+    : '';
 
   return (
     <main className="max-w-xl mx-auto px-3 sm:px-5 py-3 sm:py-5 space-y-3.5">
@@ -754,16 +795,24 @@ export const Assessment: React.FC<AssessmentProps> = ({
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-[#17365D] hover:bg-[#F5F7FA] transition-colors"
         >
           <Icon name="arrowL" size={16} />
-          <span>होम (Home)</span>
+          <span>{currentLang === 'en' ? 'Home' : 'होम'}</span>
         </button>
 
         {/* Step Progress Indicator */}
         <div className="flex flex-col items-center">
           <div className="text-xs font-extrabold text-[#17365D]">
             {currentStepIndex === -1
-              ? 'प्रोफ़ाइल शुरुआत'
+              ? currentLang === 'en'
+                ? 'Profile Setup'
+                : currentLang === 'bho'
+                ? 'प्रोफ़ाइल शुरुआत'
+                : 'प्रोफ़ाइल शुरुआत'
               : currentStepIndex >= STEPS.length
-              ? 'समीक्षा (Review)'
+              ? currentLang === 'en'
+                ? 'Profile Review'
+                : 'प्रोफ़ाइल समीक्षा'
+              : currentLang === 'en'
+              ? `Step ${currentStepIndex + 1} / ${STEPS.length}`
               : `चरण ${currentStepIndex + 1} / ${STEPS.length}`}
           </div>
           <div className="w-24 sm:w-32 bg-[#F5F7FA] h-1.5 rounded-full overflow-hidden border border-[#DCE3EA] mt-1">
@@ -785,9 +834,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
             <button
               key={l.k}
               type="button"
-              onClick={() => {
-                onLanguageChange(l.k as SupportedLanguage);
-              }}
+              onClick={() => handleSelectLanguage(l.k as SupportedLanguage)}
               className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
                 currentLang === l.k
                   ? 'bg-white text-[#17365D] shadow-xs'
@@ -807,10 +854,14 @@ export const Assessment: React.FC<AssessmentProps> = ({
           <div className="border-b border-[#DCE3EA] pb-3 flex items-center justify-between gap-2">
             <div>
               <div className="text-xs font-bold text-[#287D73]">
-                प्रोफ़ाइल तैयार है · Profile Verified
+                {currentLang === 'en' ? 'Profile Ready' : 'प्रोफ़ाइल तैयार है'}
               </div>
               <h2 className="text-lg sm:text-xl font-extrabold text-[#17365D]">
-                आपकी आजीविका प्रोफ़ाइल
+                {currentLang === 'en'
+                  ? 'Your Livelihood Profile'
+                  : currentLang === 'bho'
+                  ? 'रउआ आजीविका प्रोफ़ाइल'
+                  : 'आपकी आजीविका प्रोफ़ाइल'}
               </h2>
             </div>
 
@@ -826,7 +877,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#DCE3EA] bg-[#F5F7FA] text-xs font-bold text-[#17365D] hover:bg-slate-100"
             >
               <Icon name="volume2" size={14} />
-              <span>सुनें</span>
+              <span>{currentLang === 'en' ? 'Listen' : 'सुनें'}</span>
             </button>
           </div>
 
@@ -836,36 +887,52 @@ export const Assessment: React.FC<AssessmentProps> = ({
             </div>
           )}
 
-          {/* Summary Cards Grid */}
+          {/* Summary Cards Grid (Localized in Selected Language) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
             <div className="p-3 bg-[#F5F7FA] rounded-xl border border-[#DCE3EA]">
-              <span className="text-[11px] font-semibold text-[#5F6B76]">नाम (Name)</span>
+              <span className="text-[11px] font-semibold text-[#5F6B76]">
+                {currentLang === 'en' ? 'Name' : 'नाम'}
+              </span>
               <div className="font-bold text-[#17365D] mt-0.5 text-sm">{answers.name || '—'}</div>
             </div>
 
             <div className="p-3 bg-[#F5F7FA] rounded-xl border border-[#DCE3EA]">
-              <span className="text-[11px] font-semibold text-[#5F6B76]">शिक्षा (Education)</span>
-              <div className="font-bold text-[#17365D] mt-0.5 text-sm">{answers.education || '—'}</div>
+              <span className="text-[11px] font-semibold text-[#5F6B76]">
+                {currentLang === 'en' ? 'Education' : 'शिक्षा'}
+              </span>
+              <div className="font-bold text-[#17365D] mt-0.5 text-sm">
+                {speechService.localizeProfileValue('education', answers.education, currentLang) || '—'}
+              </div>
             </div>
 
             <div className="p-3 bg-[#F5F7FA] rounded-xl border border-[#DCE3EA]">
-              <span className="text-[11px] font-semibold text-[#5F6B76]">हुनर / कौशल (Skills)</span>
+              <span className="text-[11px] font-semibold text-[#5F6B76]">
+                {currentLang === 'en' ? 'Skills' : 'हुनर / कौशल'}
+              </span>
               <div className="font-bold text-[#17365D] mt-0.5">{answers.skills || '—'}</div>
             </div>
 
             <div className="p-3 bg-[#F5F7FA] rounded-xl border border-[#DCE3EA]">
-              <span className="text-[11px] font-semibold text-[#5F6B76]">रुचि (Interests)</span>
+              <span className="text-[11px] font-semibold text-[#5F6B76]">
+                {currentLang === 'en' ? 'Interests' : 'रुचि'}
+              </span>
               <div className="font-bold text-[#17365D] mt-0.5">{answers.interests || '—'}</div>
             </div>
 
             <div className="p-3 bg-[#F5F7FA] rounded-xl border border-[#DCE3EA]">
-              <span className="text-[11px] font-semibold text-[#5F6B76]">सटीक स्थान (Exact Location)</span>
+              <span className="text-[11px] font-semibold text-[#5F6B76]">
+                {currentLang === 'en' ? 'Exact Location' : 'सटीक स्थान'}
+              </span>
               <div className="font-bold text-[#287D73] mt-0.5">{answers.location || '—'}</div>
             </div>
 
             <div className="p-3 bg-[#F5F7FA] rounded-xl border border-[#DCE3EA]">
-              <span className="text-[11px] font-semibold text-[#5F6B76]">कार्य का प्रकार (Work Type)</span>
-              <div className="font-bold text-[#17365D] mt-0.5">{answers.workType || 'Job'}</div>
+              <span className="text-[11px] font-semibold text-[#5F6B76]">
+                {currentLang === 'en' ? 'Work Type' : 'काम का प्रकार'}
+              </span>
+              <div className="font-bold text-[#17365D] mt-0.5">
+                {speechService.localizeProfileValue('workType', answers.workType || 'Job', currentLang)}
+              </div>
             </div>
           </div>
 
@@ -879,7 +946,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
               className="px-4 py-3 rounded-xl border border-[#DCE3EA] text-xs font-bold text-[#17365D] hover:bg-[#F5F7FA] flex items-center gap-1.5"
             >
               <Icon name="arrowL" size={15} />
-              <span>पीछे जाएँ (Back)</span>
+              <span>{currentLang === 'en' ? 'Back' : 'पीछे जाएँ'}</span>
             </button>
 
             <button
@@ -888,7 +955,11 @@ export const Assessment: React.FC<AssessmentProps> = ({
               className="flex-1 py-3.5 px-5 rounded-xl bg-[#17365D] hover:bg-[#245A91] text-white text-sm font-extrabold shadow-sm flex items-center justify-center gap-2 transition-all active:scale-98"
             >
               <Icon name="check" size={18} />
-              <span>रोडमैप और योजनाएं देखें →</span>
+              <span>
+                {currentLang === 'en'
+                  ? 'View Roadmap & Schemes →'
+                  : 'रोडमैप और योजनाएं देखें →'}
+              </span>
             </button>
           </div>
         </div>
@@ -900,31 +971,37 @@ export const Assessment: React.FC<AssessmentProps> = ({
             <div className="flex items-center justify-between text-xs font-bold text-[#245A91]">
               <span>
                 {currentStepIndex === -1
-                  ? 'जीविका एआई परिचय'
-                  : `${currentStepIndex + 1}. ${currentStepConfig?.label}`}
+                  ? currentLang === 'en'
+                    ? 'JeevikaAI Introduction'
+                    : 'जीविका एआई परिचय'
+                  : `${currentStepIndex + 1}. ${stepHeaderTitle}`}
               </span>
               <span className="text-[#287D73]">
                 {conversationState === 'asking_question'
-                  ? 'बोलिए, AI बीच में भी सुन सकता है'
+                  ? currentLang === 'en'
+                    ? 'AI is speaking...'
+                    : 'AI बोल रहा है...'
                   : conversationState === 'listening'
-                  ? 'माइक चालू है · बोलिए'
+                  ? currentLang === 'en'
+                    ? 'Mic is ON · Speak now'
+                    : 'माइक चालू है · बोलिए'
                   : conversationState === 'processing_answer'
-                  ? 'समझ रहा है...'
+                  ? currentLang === 'en'
+                    ? 'Understanding...'
+                    : 'समझ रहा है...'
+                  : currentLang === 'en'
+                  ? 'Tap mic to speak'
                   : 'माइक दबाकर बोलें'}
               </span>
             </div>
 
             <h1 className="text-lg sm:text-xl font-extrabold text-[#17365D] leading-snug">
               {currentStepIndex === -1
-                ? getIntroGreeting()
+                ? getIntroGreeting(currentLang)
                 : currentStepConfig
-                ? currentStepConfig.q[currentLang] || currentStepConfig.q.hi || currentStepConfig.q.en
+                ? getStepQuestionText(currentStepIndex, currentLang)
                 : ''}
             </h1>
-
-            {currentStepConfig && currentLang !== 'en' && (
-              <p className="text-xs text-[#5F6B76]">{currentStepConfig.q.en}</p>
-            )}
           </div>
 
           {/* 2. Interactive Microphone & Waveform Studio */}
@@ -950,11 +1027,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
                 aria-label="Voice microphone control"
               >
                 <Icon
-                  name={
-                    conversationState === 'processing_answer'
-                      ? 'refresh'
-                      : 'mic'
-                  }
+                  name={conversationState === 'processing_answer' ? 'refresh' : 'mic'}
                   size={30}
                   className={conversationState === 'processing_answer' ? 'animate-spin' : ''}
                 />
@@ -963,7 +1036,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
 
             <div className="w-full max-w-xs mx-auto">
               <AudioVisualizer
-                isListening={conversationState === 'listening' || conversationState === 'asking_question'}
+                isListening={conversationState === 'listening'}
                 isSpeaking={conversationState === 'asking_question'}
                 barCount={18}
               />
@@ -971,10 +1044,16 @@ export const Assessment: React.FC<AssessmentProps> = ({
 
             <p className="text-xs font-semibold text-[#5F6B76] text-center">
               {conversationState === 'asking_question'
-                ? 'AI बोल रहा है — आप अभी तुरंत भी बोलकर जवाब दे सकते हैं'
+                ? currentLang === 'en'
+                  ? 'AI is speaking — finish listening or tap the mic to answer immediately'
+                  : 'AI सवाल बोल रहा है — पूरा सुनें या तुरंत बोलने के लिए माइक दबाएं'
                 : conversationState === 'listening'
-                ? 'बोलिए... आपके शब्द नीचे अपने-आप लिखे जा रहे हैं'
-                : 'माइक पर टैप करके अपना उत्तर बोलें'}
+                ? currentLang === 'en'
+                  ? 'Speak now... your answer is being captured below'
+                  : 'अब बोलिए... आपके शब्द नीचे अपने-आप लिखे जा रहे हैं'
+                : currentLang === 'en'
+                ? 'Tap the microphone to speak your answer'
+                : 'अपना उत्तर बोलने के लिए माइक पर टैप करें'}
             </p>
           </div>
 
@@ -989,7 +1068,13 @@ export const Assessment: React.FC<AssessmentProps> = ({
                   className="w-full sm:flex-1 py-3 px-5 rounded-xl bg-[#17365D] hover:bg-[#245A91] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-98"
                 >
                   <Icon name="check" size={16} />
-                  <span>हाँ, शुरू करें (Start Now)</span>
+                  <span>
+                    {currentLang === 'en'
+                      ? 'Yes, Start Now'
+                      : currentLang === 'bho'
+                      ? 'हँ, शुरू करीं'
+                      : 'हाँ, शुरू करें'}
+                  </span>
                 </button>
 
                 <button
@@ -997,7 +1082,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
                   onClick={handleLoadDemoProfile}
                   className="w-full sm:w-auto px-4 py-3 rounded-xl border border-[#DCE3EA] bg-[#F5F7FA] text-xs font-bold text-[#17365D] hover:bg-slate-200/70 transition-colors"
                 >
-                  डेमो प्रोफाइल देखें
+                  {currentLang === 'en' ? 'Load Demo Profile' : 'डेमो प्रोफाइल देखें'}
                 </button>
               </div>
             )}
@@ -1008,18 +1093,24 @@ export const Assessment: React.FC<AssessmentProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#17365D]">
                     {interimText || heardText
-                      ? 'आपका बोला गया उत्तर (Captured Answer)'
-                      : currentFieldVal
-                      ? 'दर्ज उत्तर (Saved Answer)'
-                      : 'उत्तर यहाँ दिखेगा (Live Capture)'}
+                      ? currentLang === 'en'
+                        ? 'Your Spoken Answer'
+                        : 'आपका बोला गया उत्तर'
+                      : localizedCurrentFieldVal
+                      ? currentLang === 'en'
+                        ? 'Saved Answer'
+                        : 'दर्ज उत्तर'
+                      : currentLang === 'en'
+                      ? 'Your answer will appear here'
+                      : 'आपका उत्तर यहाँ दिखेगा'}
                   </span>
-                  {(heardText || interimText || currentFieldVal) && !isEditingTranscript && (
+                  {(heardText || interimText || localizedCurrentFieldVal) && !isEditingTranscript && (
                     <button
                       type="button"
                       onClick={handleStartEditTranscript}
                       className="text-xs font-bold text-[#245A91] hover:underline px-2 py-0.5 rounded bg-white border border-[#DCE3EA]"
                     >
-                      सुधारें (Edit)
+                      {currentLang === 'en' ? 'Edit' : 'सुधारें'}
                     </button>
                   )}
                 </div>
@@ -1039,27 +1130,31 @@ export const Assessment: React.FC<AssessmentProps> = ({
                         onClick={() => setIsEditingTranscript(false)}
                         className="px-3 py-1.5 text-xs font-bold text-[#5F6B76]"
                       >
-                        रद्द करें
+                        {currentLang === 'en' ? 'Cancel' : 'रद्द करें'}
                       </button>
                       <button
                         type="button"
                         onClick={handleSaveEditedTranscript}
                         className="px-4 py-1.5 bg-[#17365D] text-white text-xs font-bold rounded-lg"
                       >
-                        सहेजें व आगे बढ़ें
+                        {currentLang === 'en' ? 'Save & Next' : 'सहेजें व आगे बढ़ें'}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="min-h-[38px] flex items-center">
-                    {interimText || heardText || currentFieldVal ? (
+                    {interimText || heardText || localizedCurrentFieldVal ? (
                       <div className="w-full bg-white px-3 py-2 rounded-lg border border-[#DCE3EA] text-sm font-bold text-[#17365D] flex items-center justify-between gap-2">
-                        <span>{interimText || heardText || currentFieldVal}</span>
+                        <span>{interimText || heardText || localizedCurrentFieldVal}</span>
                         <Icon name="check" size={16} className="text-[#287D73] flex-none" />
                       </div>
                     ) : (
                       <span className="text-xs text-[#5F6B76]">
-                        { currentStepConfig?.ph[currentLang] || currentStepConfig?.ph.hi || 'सीधे बोलें या नीचे विकल्प चुनें...' }
+                        {currentStepConfig?.ph[currentLang] ||
+                          currentStepConfig?.ph.hi ||
+                          (currentLang === 'en'
+                            ? 'Speak directly or choose an option below...'
+                            : 'सीधे बोलें या नीचे विकल्प चुनें...')}
                       </span>
                     )}
                   </div>
@@ -1075,9 +1170,9 @@ export const Assessment: React.FC<AssessmentProps> = ({
                   const label =
                     currentLang === 'bho'
                       ? opt.bho || opt.hi
-                      : currentLang === 'hi'
-                      ? opt.hi
-                      : opt.v;
+                      : currentLang === 'en'
+                      ? opt.v
+                      : opt.hi;
 
                   return (
                     <button
@@ -1103,7 +1198,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
               <div className="flex flex-wrap gap-1.5">
                 {currentStepConfig.chips.map((c) => {
                   const label =
-                    currentLang === 'bho' ? c.bho || c.hi : currentLang === 'hi' ? c.hi : c.en;
+                    currentLang === 'bho' ? c.bho || c.hi : currentLang === 'en' ? c.en : c.hi;
                   const currList = splitList(currentFieldVal);
                   const isPicked = currList.includes(label);
 
@@ -1139,16 +1234,20 @@ export const Assessment: React.FC<AssessmentProps> = ({
               </div>
             )}
 
-            {/* LOCATION STEP: Exact Auto-Fetch GPS Card Only (No Manual District List Below) */}
+            {/* LOCATION STEP: Exact Auto-Fetch GPS Card */}
             {currentStepConfig && currentStepConfig.key === 'location' && (
               <div className="rounded-xl border border-[#DCE3EA] bg-[#F8FAFC] p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-0.5">
                     <div className="text-xs font-bold text-[#287D73]">
-                      ऑटोमैटिक जीपीएस लोकेशन · Exact Village/City &amp; District
+                      {currentLang === 'en'
+                        ? 'Automatic GPS Location · Village/City & District'
+                        : 'ऑटोमैटिक जीपीएस लोकेशन · सटीक गाँव/शहर और जिला'}
                     </div>
                     <p className="text-xs text-[#5F6B76]">
-                      डैशबोर्ड पर आपके सटीक गाँव/शहर और जिले की सरकारी योजनाएं व रोजगार दिखाने के लिए ऑटो-फेच चालू है।
+                      {currentLang === 'en'
+                        ? 'Your exact village/town and district is used to show nearby jobs, training centers, and schemes.'
+                        : 'डैशबोर्ड पर आपके सटीक गाँव/शहर और जिले की सरकारी योजनाएं व रोजगार दिखाने के लिए ऑटो-फेच चालू है।'}
                     </p>
                   </div>
                 </div>
@@ -1156,7 +1255,9 @@ export const Assessment: React.FC<AssessmentProps> = ({
                 {answers.location && (
                   <div className="p-3 bg-white border border-[#287D73]/40 rounded-xl flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-[11px] font-semibold text-[#5F6B76]">आपका सटीक स्थान:</div>
+                      <div className="text-[11px] font-semibold text-[#5F6B76]">
+                        {currentLang === 'en' ? 'Detected Location:' : 'आपका सटीक स्थान:'}
+                      </div>
                       <div className="text-sm font-extrabold text-[#17365D] truncate">
                         📍 {answers.location}
                       </div>
@@ -1166,7 +1267,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
                       onClick={handleNextStep}
                       className="px-3.5 py-2 bg-[#287D73] hover:bg-[#1E6058] text-white font-bold rounded-lg text-xs flex-none"
                     >
-                      आगे बढ़ें →
+                      {currentLang === 'en' ? 'Continue →' : 'आगे बढ़ें →'}
                     </button>
                   </div>
                 )}
@@ -1177,11 +1278,19 @@ export const Assessment: React.FC<AssessmentProps> = ({
                   disabled={isDetectingGps}
                   className="w-full py-3 px-4 rounded-xl bg-[#17365D] hover:bg-[#245A91] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-75"
                 >
-                  <Icon name={isDetectingGps ? 'refresh' : 'target'} size={17} className={isDetectingGps ? 'animate-spin' : ''} />
+                  <Icon
+                    name={isDetectingGps ? 'refresh' : 'target'}
+                    size={17}
+                    className={isDetectingGps ? 'animate-spin' : ''}
+                  />
                   <span>
                     {isDetectingGps
-                      ? 'सटीक गाँव/शहर और जिला खोजा जा रहा है...'
-                      : '📍 सटीक GPS लोकेशन ऑटो-फेच करें (Auto-Detect Exact Location)'}
+                      ? currentLang === 'en'
+                        ? 'Detecting exact village/city & district...'
+                        : 'सटीक गाँव/शहर और जिला खोजा जा रहा है...'
+                      : currentLang === 'en'
+                      ? '📍 Auto-Detect Exact GPS Location'
+                      : '📍 सटीक जीपीएस लोकेशन ऑटो-फेच करें'}
                   </span>
                 </button>
               </div>
@@ -1212,7 +1321,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
                   }}
                   className="px-4 py-3 rounded-xl bg-[#17365D] text-white text-xs font-bold"
                 >
-                  दर्ज करें
+                  {currentLang === 'en' ? 'Submit' : 'दर्ज करें'}
                 </button>
               </div>
             )}
@@ -1239,7 +1348,7 @@ export const Assessment: React.FC<AssessmentProps> = ({
               className="min-h-11 px-3.5 py-2 rounded-xl border border-[#DCE3EA] bg-white hover:bg-slate-100 text-xs font-extrabold text-[#17365D] flex items-center gap-1.5 transition-colors"
             >
               <Icon name="arrowL" size={15} />
-              <span>पिछला (Back)</span>
+              <span>{currentLang === 'en' ? 'Back' : 'पिछला'}</span>
             </button>
 
             {/* Center Utility Controls */}
@@ -1248,10 +1357,10 @@ export const Assessment: React.FC<AssessmentProps> = ({
                 type="button"
                 onClick={handleReplayQuestion}
                 className="min-h-11 px-3 py-2 rounded-xl border border-[#DCE3EA] bg-white hover:bg-slate-100 text-xs font-bold text-[#17365D] flex items-center gap-1 transition-colors"
-                title="सवाल फिर से सुनें"
+                title={currentLang === 'en' ? 'Replay Question' : 'सवाल फिर से सुनें'}
               >
                 <Icon name="volume2" size={15} />
-                <span className="hidden sm:inline">सुनें</span>
+                <span className="hidden sm:inline">{currentLang === 'en' ? 'Listen' : 'सुनें'}</span>
               </button>
 
               <button
@@ -1262,17 +1371,25 @@ export const Assessment: React.FC<AssessmentProps> = ({
                 className="min-h-11 px-3 py-2 rounded-xl border border-[#DCE3EA] bg-white hover:bg-slate-100 text-xs font-bold text-[#245A91] flex items-center gap-1 transition-colors"
               >
                 <Icon name="edit" size={14} />
-                <span>{inputMode === 'voice' ? 'लिखें' : 'बोलें'}</span>
+                <span>
+                  {inputMode === 'voice'
+                    ? currentLang === 'en'
+                      ? 'Type'
+                      : 'लिखें'
+                    : currentLang === 'en'
+                    ? 'Speak'
+                    : 'बोलें'}
+                </span>
               </button>
             </div>
 
-            {/* Right Side: Next / Skip Button */}
+            {/* Right Side: Next Button */}
             <button
               type="button"
               onClick={handleNextStep}
               className="min-h-11 px-4 py-2 rounded-xl bg-[#245A91] hover:bg-[#17365D] text-white text-xs font-extrabold flex items-center gap-1.5 transition-colors"
             >
-              <span>अगला (Next)</span>
+              <span>{currentLang === 'en' ? 'Next' : 'अगला'}</span>
               <Icon name="arrowR" size={15} />
             </button>
           </div>
@@ -1289,14 +1406,24 @@ export const Assessment: React.FC<AssessmentProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-bold text-[#17365D]">
-                  आवाज़ से प्रोफ़ाइल बनाएँ
+                  {currentLang === 'en'
+                    ? 'Create Profile by Voice'
+                    : currentLang === 'bho'
+                    ? 'आवाज़ से प्रोफ़ाइल बनाईं'
+                    : 'आवाज़ से प्रोफ़ाइल बनाएँ'}
                 </h3>
-                <p className="text-xs text-[#5F6B76]">Voice Livelihood Profile Setup</p>
+                <p className="text-xs text-[#5F6B76]">
+                  {currentLang === 'en'
+                    ? 'Voice Livelihood Profile Setup'
+                    : 'बोलकर आसान प्रोफ़ाइल निर्माण'}
+                </p>
               </div>
             </div>
 
             <p className="text-xs text-[#5F6B76] leading-relaxed">
-              जीविका एआई आपसे कुछ आसान सवाल पूछेगा। आप AI के बोलते समय बीच में भी तुरंत अपना जवाब बोल सकते हैं, और आपका स्थान जीपीएस से स्वतः ले लिया जाएगा।
+              {currentLang === 'en'
+                ? 'JeevikaAI will ask you a few simple questions aloud and automatically open the microphone for your answer.'
+                : 'जीविका एआई आपसे बोलकर कुछ आसान सवाल पूछेगा और सवाल पूरा होते ही माइक अपने-आप चालू हो जाएगा।'}
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -1311,15 +1438,15 @@ export const Assessment: React.FC<AssessmentProps> = ({
                 }}
                 className="px-3.5 py-2.5 rounded-xl border border-[#DCE3EA] text-xs font-bold text-[#5F6B76] hover:text-[#17365D]"
               >
-                लिखकर भरें (Type)
+                {currentLang === 'en' ? 'Type Manually' : 'लिखकर भरें'}
               </button>
               <button
                 type="button"
-                onClick={startConversation}
+                onClick={() => startConversation()}
                 className="px-5 py-2.5 rounded-xl bg-[#245A91] text-white text-xs font-bold hover:bg-[#17365D] shadow-sm flex items-center gap-1.5"
               >
                 <Icon name="mic" size={14} />
-                <span>बोलकर शुरू करें (Start)</span>
+                <span>{currentLang === 'en' ? 'Start Speaking' : 'बोलकर शुरू करें'}</span>
               </button>
             </div>
           </div>

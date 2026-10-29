@@ -108,6 +108,8 @@ export default function App() {
     };
   }, [currentLang]);
 
+  const hasAutoDetectedGpsRef = useRef<boolean>(false);
+
   // Subscribe to location intelligence changes & keep synced with profile.location
   useEffect(() => {
     const unsub = locationIntelligenceService.subscribe((data) => {
@@ -120,6 +122,46 @@ export default function App() {
     locationIntelligenceService.fetchLocationData(locToFetch, currentLang, profile);
     return () => unsub();
   }, [profile?.location]);
+
+  // Automatically capture exact current GPS location when user visits Dashboard, Naukri, Training, or loads Demo data
+  useEffect(() => {
+    const accuracy = locationIntelligenceService.getLocationAccuracy();
+    if (hasAutoDetectedGpsRef.current || (accuracy.source === 'gps' && accuracy.latitude)) {
+      return;
+    }
+    if (['dashboard', 'opportunities', 'training', 'skill-gap', 'saved'].includes(currentView)) {
+      hasAutoDetectedGpsRef.current = true;
+      locationIntelligenceService
+        .detectGpsLocation()
+        .then(async (detected) => {
+          if (detected && detected.location) {
+            setActiveLocation(detected.location);
+            locationIntelligenceService.setActiveLocation(detected.location);
+            setProfile((prev) => {
+              if (!prev) return prev;
+              const updatedProf = {
+                ...prev,
+                location: detected.location,
+                locationAccuracy: detected.accuracyLevel,
+                locationConfidence: detected.confidenceScore,
+                locationAccuracyMeters: detected.accuracyMeters,
+              };
+              storageService.saveProfile(updatedProf);
+              return updatedProf;
+            });
+            const fresh = await locationIntelligenceService.fetchLocationData(
+              detected.location,
+              currentLang,
+              profile
+            );
+            setLocationData(fresh);
+          }
+        })
+        .catch(() => {
+          // Keep existing district fallback if GPS permission is denied
+        });
+    }
+  }, [currentView]);
 
   // Resilient multi-device cloud synchronization for local media
   useEffect(() => {
@@ -294,12 +336,39 @@ export default function App() {
     );
   };
 
-  const handleLoadDemoBeneficiary = () => {
-    const demoProf = { ...DEMO };
+  const handleLoadDemoBeneficiary = async () => {
+    const demoProf = { ...DEMO, location: activeLocation || DEMO.location };
     setProfile(demoProf);
     storageService.saveProfile(demoProf);
-    notify('Loaded demo beneficiary: Sunita Devi (Maharajganj, UP).');
     navigateTo('dashboard');
+
+    // Immediately attempt to capture user's real GPS location so demo data reflects their actual area & distances
+    try {
+      const detected = await locationIntelligenceService.detectGpsLocation();
+      if (detected && detected.location) {
+        const syncedDemo = {
+          ...demoProf,
+          location: detected.location,
+          locationAccuracy: detected.accuracyLevel,
+          locationConfidence: detected.confidenceScore,
+          locationAccuracyMeters: detected.accuracyMeters,
+        };
+        setActiveLocation(detected.location);
+        setProfile(syncedDemo);
+        storageService.saveProfile(syncedDemo);
+        const fresh = await locationIntelligenceService.fetchLocationData(
+          detected.location,
+          currentLang,
+          syncedDemo
+        );
+        setLocationData(fresh);
+        notify(`डेमो प्रोफ़ाइल आपकी वर्तमान लोकेशन (${detected.location}) के साथ सिंक हो गई है!`);
+        return;
+      }
+    } catch {
+      // Fallback to activeLocation if GPS permission not granted
+    }
+    notify(`डेमो प्रोफ़ाइल लोड हो गई (${demoProf.location})।`);
   };
 
   const handleShortlistToggle = (id: string) => {
@@ -793,7 +862,8 @@ export default function App() {
         <FloatingVoiceAssistant
           currentView={currentView}
           currentLang={currentLang}
-          profile={profile}
+          profile={activeProfile}
+          locationData={locationData}
           go={navigateTo}
           onNotify={notify}
           onUpdateProfile={handleProfileUpdate}
@@ -809,6 +879,9 @@ export default function App() {
           onClose={() => setSelectedOpportunity(null)}
           onShortlistToggle={handleShortlistToggle}
           isShortlisted={Boolean(shortlist[selectedOpportunity.id])}
+          activeLocation={activeLocation}
+          locationData={locationData}
+          currentLang={currentLang}
         />
       )}
 

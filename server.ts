@@ -383,7 +383,14 @@ Return strictly JSON with no markdown formatting:
 // API Route: Floating Voice AI Assistant & Site Navigation Proxy
 app.post('/api/chat', async (req: Request, res: Response) => {
   try {
-    const { message, language = 'hi', currentView = 'home', userProfile = {} } = req.body;
+    const {
+      message,
+      language = 'hi',
+      currentView = 'home',
+      userProfile = {},
+      chatHistory = [],
+      locationData = null,
+    } = req.body;
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message text is required' });
     }
@@ -413,8 +420,12 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       else if (lower.includes('job') || lower.includes('kaam') || lower.includes('नौकरी') || lower.includes('रोजगार') || lower.includes('naukri')) {
         navTarget = 'opportunities';
         highlight = 'opportunities-section';
-        if (lower.includes('padh') || lower.includes('card') || lower.includes('कार्ड') || lower.includes('batao') || lower.includes('read') || lower.includes('first') || lower.includes('salary') || lower.includes('solar')) {
-          reply = 'नौकरी कार्ड विवरण: 1. डिजिटल सर्विस असिस्टेंट (CSC केंद्र) - वेतन ₹8,000 से ₹12,000, 10वीं पास आवश्यक। 2. सोलर इंस्टॉलेशन हेल्पर - वेतन ₹9,000 से ₹14,000। 3. रिटेल सेल्स एसोसिएट - वेतन ₹7,000 से ₹10,000। रोजगार सूची खोली जा रही है।';
+        if (locationData?.opportunities?.length) {
+          const topJobs = locationData.opportunities
+            .slice(0, 3)
+            .map((j: any, i: number) => `${i + 1}. ${j.title} (${j.org}) - वेतन ${j.pay}, दूरी ${j.distance}`)
+            .join('। ');
+          reply = `आपके क्षेत्र (${locationData.locationLabel || userProfile?.location || 'महराजगंज'}) की नौकरियां: ${topJobs}।`;
         } else {
           reply = 'जी, आपके नजदीकी रोजगार और नौकरी के अवसर खोले जा रहे हैं।';
         }
@@ -422,8 +433,12 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       // 4. Training Card reading
       else if (lower.includes('train') || lower.includes('center') || lower.includes('प्रशिक्षण') || lower.includes('केंद्र') || lower.includes('pmkvy') || lower.includes('rseti')) {
         navTarget = 'training';
-        if (lower.includes('padh') || lower.includes('card') || lower.includes('कार्ड') || lower.includes('batao') || lower.includes('read')) {
-          reply = 'कौशल प्रशिक्षण केंद्र कार्ड: 1. PMKVY डिजिटल साक्षरता व डाटा एंट्री केंद्र, महराजगंज - निःशुल्क ट्रेनिंग व सरकारी वजीफा। 2. RSETI सिलाई मशीन व स्वरोजगार केंद्र, गोरखपुर - फ्री आवासीय कोर्स व टूलकिट। प्रशिक्षण केंद्र खोले जा रहे हैं।';
+        if (locationData?.trainingCenters?.length) {
+          const topCenters = locationData.trainingCenters
+            .slice(0, 3)
+            .map((t: any, i: number) => `${i + 1}. ${t.title} (${t.org}) - ${t.pay}, दूरी ${t.distance}`)
+            .join('। ');
+          reply = `आपके पास के कौशल प्रशिक्षण केंद्र: ${topCenters}।`;
         } else {
           reply = 'आपके पास के PMKVY और RSETI कौशल प्रशिक्षण केंद्र दिखाए जा रहे हैं।';
         }
@@ -477,8 +492,25 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       });
     }
 
+    const recentConversation = Array.isArray(chatHistory)
+      ? chatHistory
+          .slice(-8)
+          .map((turn: any) => `${turn.sender === 'user' ? 'User' : 'JeevikaAI'}: ${turn.text}`)
+          .join('\n')
+      : '';
+
+    const liveScreenSummary = locationData
+      ? JSON.stringify({
+          location: locationData.locationLabel,
+          jobsOnScreen: locationData.opportunities || [],
+          trainingCentersOnScreen: locationData.trainingCenters || [],
+          schemesOnScreen: locationData.schemes || [],
+          districtInsight: locationData.insight || null,
+        })
+      : 'Standard district data active';
+
     const ai = new GoogleGenAI();
-    const systemPrompt = `You are JeevikaAI (जीविका एआई), a deeply trained, compassionate, and highly knowledgeable voice AI vocational and livelihood counselor for Indian rural and semi-urban citizens.
+    const systemPrompt = `You are JeevikaAI (जीविका एआई), a deeply trained, compassionate, and natural conversational voice AI vocational and livelihood counselor for Indian rural and semi-urban citizens.
 You have comprehensive mastery of:
 1. Indian Vocational Ecosystem & NSQF (National Skills Qualification Framework):
    - NSQF Levels 1-5 (Helper to Skilled Technician to Supervisor).
@@ -490,31 +522,25 @@ You have comprehensive mastery of:
    - PMEGP: 15-35% capital subsidy for manufacturing/services micro-units.
    - RSETI (Rural Self Employment Training Institute): Run by lead banks (SBI, PNB, Canara, Union Bank) in every district; 100% FREE residential courses with food, lodging, practical skills and bank credit linkage.
    - State Schemes: UP ODOP & Mukhyamantri Yuva Swarojgar; Bihar Mukhyamantri Udyami Yojana (₹10L project: ₹5L 100% grant + ₹5L 1% loan); MP Udyam Kranti; Rajasthan Yuva Sambal.
-3. Realistic District-Level Wages & Economic Realities:
-   - Entry digital assistant / data entry: ₹8,000 - ₹13,500/month.
-   - Solar rooftop helper / installer: ₹9,500 - ₹16,000/month.
-   - Retail sales & counter billing: ₹7,500 - ₹12,000/month.
-   - Boutique tailor & self-help group stitching: ₹6,000 - ₹15,000/month.
-4. Active Location Grounding:
-   - User's Current Location: "${userProfile?.location || 'Maharajganj, Uttar Pradesh'}".
+3. Live Screen Data & Active Location Grounding:
+   - User's Current Location: "${userProfile?.location || locationData?.locationLabel || 'Maharajganj, Uttar Pradesh'}".
    - Current Page View: "${currentView}"
    - User Language Preference: "${language}" (hi = Hindi, bho = Bhojpuri, hin = Hinglish, en = English)
    - User Profile: ${JSON.stringify(userProfile)}
-   - User Spoke: "${message}"
+   - ACTUAL LIVE CARDS & DATA PRESENT ON SCREEN RIGHT NOW: ${liveScreenSummary}
+4. Multi-Turn Conversation Memory (Previous Chat Messages):
+${recentConversation || 'No prior turns.'}
+   - User Just Spoke / Asked: "${message}"
 
 Your Instructions:
-1. Conversational Reply:
-   - Provide a natural, encouraging 2-3 sentence spoken reply in the user's language (${language === 'bho' ? 'Bhojpuri' : language === 'en' ? 'English' : language === 'hin' ? 'Hinglish' : 'Hindi'}).
-   - Ground your answer in the user's location and profile. If they ask about jobs, training, or schemes in their area, provide actual details relevant to their district/state.
-2. Card Reading / Explanation:
-   - "Roadmap Card" / "रोडमैप": Explain career stages, NSQF level, duration, and monthly earning range. Target: "dashboard".
-   - "Job / Naukari Card" / "नौकरी": Read specific job role, employer type, salary, and requirements. Target: "opportunities".
-   - "Training / Kendra Card" / "ट्रेनिंग": Read PMKVY, RSETI, or ITI centers with free benefits. Target: "training".
-   - "Yojana Card" / "योजना": Read PM Vishwakarma, Mudra, or State Udyami scheme grants and loan limits. Target: "faq".
+1. Natural Conversational Chat & Follow-Up Memory:
+   - Understand the user's question in the context of the previous chat messages above ("Recent Conversation"). If the user asks a follow-up about a specific job card, training center, scheme, salary, distance, eligibility, or how to apply ("इसमें कैसे अप्लाई करें?", "पहला वाला कहाँ है?", "कितना पैसा मिलेगा?", "कागज क्या लगेगा?"), answer directly and specifically using the ACTUAL LIVE CARDS & DATA PRESENT ON SCREEN.
+   - Speak naturally like a warm, helpful human advisor in the user's language (${language === 'bho' ? 'Bhojpuri' : language === 'en' ? 'English' : language === 'hin' ? 'Hinglish' : 'Hindi'}) in 2-4 clear sentences suitable for voice readout.
+2. Reading Screen Data:
+   - Whenever the user asks to read any card, section, or page data, read the actual titles, organizations, pay/benefits, locations, and distances from the live screen data above.
 3. Dynamic Navigation:
    - Allowed targetView values: "home", "dashboard", "opportunities", "training", "skill-gap", "saved", "profile", "faq", "history", "notifications", "assessment", null.
-   - If user asks to go to dashboard or roadmap ("go to dashboard", "open dashboard", "dashboard") -> "dashboard".
-   - If user asks for settings ("open settings", "go to settings", "settings") -> "notifications".
+   - Set targetView ONLY if the user wants to open/navigate to a different section; if they are asking a follow-up question on the current topic, keep targetView as null.
 4. Location or Profile Updates:
    - If the user mentions their location/district (e.g. "main Patna se hoon", "Gorakhpur mein kaam chahiye", "mera zila Varanasi hai"), extract "location" into "profileUpdates" (e.g. "Patna, Bihar", "Gorakhpur, Uttar Pradesh", "Varanasi, Uttar Pradesh").
    - If the user mentions name, education, or skills, extract them into "profileUpdates".
@@ -523,7 +549,7 @@ Your Instructions:
 
 Return strictly JSON with NO markdown codeblocks:
 {
-  "reply": "Warm spoken reply in user's language",
+  "reply": "Warm spoken reply in user's language with no markdown symbols",
   "targetView": "opportunities" | "training" | "dashboard" | "skill-gap" | "saved" | "profile" | "faq" | "home" | "notifications" | "assessment" | null,
   "actionHighlight": "opportunities-section" | "roadmap-section" | "training-section" | null,
   "profileUpdates": {
@@ -674,13 +700,14 @@ Return ONLY valid JSON matching this structure without markdown formatting:
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
 
+  let viteMiddleware: any = null;
   if (!isProd) {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
+    app.use((req, res, next) => {
+      if (viteMiddleware) {
+        return viteMiddleware(req, res, next);
+      }
+      next();
     });
-    app.use(vite.middlewares);
   } else {
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (_req, res) => {
@@ -688,9 +715,28 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const httpServer = app.listen(PORT, '0.0.0.0', () => {
     console.log(`JeevikaAI server running on http://0.0.0.0:${PORT}`);
   });
+
+  if (!isProd) {
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const hmrEnabled = process.env.DISABLE_HMR !== 'true';
+      const vite = await createViteServer({
+        server: {
+          middlewareMode: true,
+          hmr: hmrEnabled ? { server: httpServer } : false,
+          watch: process.env.DISABLE_HMR === 'true' ? null : {},
+        },
+        appType: 'spa',
+      });
+      viteMiddleware = vite.middlewares;
+    } catch (err) {
+      console.error('Failed to initialize Vite middleware:', err);
+    }
+  }
 }
 
 startServer();
+

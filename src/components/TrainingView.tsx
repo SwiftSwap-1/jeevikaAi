@@ -5,7 +5,7 @@ import { JOBS } from '../data/mockData';
 import { t } from '../services/translationService';
 import { contentService, OperationType, handleFirestoreError } from '../services/firebase';
 import { speechService } from '../services/speechService';
-import { POPULAR_INDIAN_REGIONS } from '../services/locationIntelligenceService';
+import { POPULAR_INDIAN_REGIONS, locationIntelligenceService } from '../services/locationIntelligenceService';
 
 interface TrainingViewProps {
   onShortlistToggle: (id: string) => void;
@@ -22,6 +22,7 @@ interface TrainingViewProps {
 
 interface EnrichedTrainingItem extends Opportunity {
   isLiveFirestore?: boolean;
+  fromLocationData?: boolean;
 }
 
 export const TrainingView: React.FC<TrainingViewProps> = ({
@@ -48,12 +49,15 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
   // Audio narration state for low-literacy beneficiaries
   const [speakingItemId, setSpeakingItemId] = useState<string | null>(null);
 
-  // District state
+  const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
+
+  // District state (handles "Locality, District, State" or "District, State")
   const initialDistrict = useMemo(() => {
     if (locationData?.district) return locationData.district;
     if (userProfile?.location) {
-      const parts = userProfile.location.split(',');
-      return parts[0]?.trim() || 'Maharajganj';
+      const parts = userProfile.location.split(',').map((p) => p.trim()).filter(Boolean);
+      const dist = parts.length >= 3 ? parts[parts.length - 2] : parts[0];
+      return dist || 'Maharajganj';
     }
     return 'Maharajganj';
   }, [locationData?.district, userProfile?.location]);
@@ -65,15 +69,34 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
   useEffect(() => {
     if (locationData?.district && locationData.district !== selectedDistrict) {
       setSelectedDistrict(locationData.district);
+    } else if (!locationData?.district && initialDistrict && initialDistrict !== selectedDistrict) {
+      setSelectedDistrict(initialDistrict);
     }
-  }, [locationData?.district]);
+  }, [locationData?.district, initialDistrict]);
+
+  const handleAutoDetectCurrentLocation = async () => {
+    if (isDetectingGps) return;
+    setIsDetectingGps(true);
+    try {
+      const detected = await locationIntelligenceService.detectGpsLocation();
+      if (detected && detected.location) {
+        setSelectedDistrict(detected.district || detected.location.split(',')[0].trim());
+        if (onLocationChange) {
+          onLocationChange(detected.location);
+        }
+      }
+    } catch {
+      // Ignore if permission denied
+    } finally {
+      setIsDetectingGps(false);
+    }
+  };
 
   // Real-time subscription to 'training_centers' collection in Firestore
   useEffect(() => {
     let isSubscribed = true;
     setIsLoadingFirestore(true);
 
-    // Also listen to opportunities to include any training items added there
     let oppTraining: Opportunity[] = [];
     const unsubOpp = contentService.subscribe<Opportunity>(
       'opportunities',
@@ -91,7 +114,6 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
       (items) => {
         if (!isSubscribed) return;
         const combined = [...(items || []), ...oppTraining];
-        // Deduplicate
         const uniqueMap = new Map<string, Opportunity>();
         combined.forEach((c) => uniqueMap.set(c.id, c));
         setFirestoreTrainingCenters(Array.from(uniqueMap.values()));
@@ -125,26 +147,40 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
     const list: EnrichedTrainingItem[] = [];
     const seenKeys = new Set<string>();
 
-    // 1. Add real-time Firestore training items
+    // 1. First add locationData training centers (already tailored to active location)
+    if (locationData?.trainingCenters && locationData.trainingCenters.length > 0) {
+      locationData.trainingCenters.forEach((item) => {
+        const key = `${item.title.toLowerCase().trim()}|${item.org.toLowerCase().trim()}`;
+        if (!seenKeys.has(key) && !seenKeys.has(item.id)) {
+          seenKeys.add(key);
+          seenKeys.add(item.id);
+          list.push({
+            ...item,
+            km: typeof item.km === 'number' ? item.km : 6,
+            isLiveFirestore: false,
+            fromLocationData: true,
+          });
+        }
+      });
+    }
+
+    // 2. Add real-time Firestore training items
     firestoreTrainingCenters.forEach((item) => {
-      const key = `${item.title.toLowerCase().trim()}|${item.org.toLowerCase().trim()}`;
-      seenKeys.add(key);
-      seenKeys.add(item.id);
-      list.push({ ...item, isLiveFirestore: true });
-    });
-
-    // 2. Add local locationData or seeded training centers
-    const baseSource =
-      locationData && locationData.trainingCenters && locationData.trainingCenters.length > 0
-        ? locationData.trainingCenters
-        : JOBS.filter((j) => j.type === 'Training');
-
-    baseSource.forEach((item) => {
       const key = `${item.title.toLowerCase().trim()}|${item.org.toLowerCase().trim()}`;
       if (!seenKeys.has(key) && !seenKeys.has(item.id)) {
         seenKeys.add(key);
         seenKeys.add(item.id);
-        list.push({ ...item, isLiveFirestore: false });
+        list.push({ ...item, isLiveFirestore: true, fromLocationData: false });
+      }
+    });
+
+    // 3. Add seeded training centers
+    JOBS.filter((j) => j.type === 'Training').forEach((item) => {
+      const key = `${item.title.toLowerCase().trim()}|${item.org.toLowerCase().trim()}`;
+      if (!seenKeys.has(key) && !seenKeys.has(item.id)) {
+        seenKeys.add(key);
+        seenKeys.add(item.id);
+        list.push({ ...item, isLiveFirestore: false, fromLocationData: false });
       }
     });
 
@@ -152,15 +188,30 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
   }, [firestoreTrainingCenters, locationData]);
 
   // District matcher
-  const matchesDistrict = (item: Opportunity, districtName: string): boolean => {
+  const matchesDistrict = (item: EnrichedTrainingItem, districtName: string): boolean => {
     if (!districtName || districtName === 'all' || districtName.toLowerCase() === 'all india') {
+      return true;
+    }
+    if (
+      item.fromLocationData &&
+      (!locationData?.district ||
+        locationData.district.toLowerCase().trim() === districtName.toLowerCase().trim() ||
+        (locationData.location || '').toLowerCase().includes(districtName.toLowerCase().trim()))
+    ) {
       return true;
     }
     const dLower = districtName.toLowerCase().trim();
     const locLower = (item.loc || '').toLowerCase();
+    const titleLower = (item.title || '').toLowerCase();
+    const orgLower = (item.org || '').toLowerCase();
     const explicitDistrict = ((item as any).district || '').toLowerCase();
 
-    if (locLower.includes(dLower) || explicitDistrict.includes(dLower)) {
+    if (
+      locLower.includes(dLower) ||
+      titleLower.includes(dLower) ||
+      orgLower.includes(dLower) ||
+      explicitDistrict.includes(dLower)
+    ) {
       return true;
     }
     if (locLower.includes('all india') || locLower.includes('statewide') || locLower.includes('anywhere')) {
@@ -169,20 +220,17 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
     return false;
   };
 
-  // Filtered training cards
+  // Filtered training cards (with non-blank guarantee)
   const filtered = useMemo(() => {
-    return combinedTrainingItems.filter((item) => {
-      // Pathway filter
+    const applyPathwayAndSearch = (item: EnrichedTrainingItem, enforceDistrict: boolean) => {
       if (filterPathway !== 'all' && item.path !== filterPathway) {
         return false;
       }
 
-      // District filter
-      if (!matchesDistrict(item, selectedDistrict)) {
+      if (enforceDistrict && !matchesDistrict(item, selectedDistrict)) {
         return false;
       }
 
-      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -194,8 +242,20 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
       }
 
       return true;
-    });
-  }, [combinedTrainingItems, filterPathway, selectedDistrict, searchQuery]);
+    };
+
+    const strictMatches = combinedTrainingItems.filter((item) => applyPathwayAndSearch(item, true));
+    if (strictMatches.length > 0 || searchQuery.trim()) {
+      return strictMatches;
+    }
+    const locationDataMatches = combinedTrainingItems.filter(
+      (item) => item.fromLocationData && applyPathwayAndSearch(item, false)
+    );
+    if (locationDataMatches.length > 0) {
+      return locationDataMatches;
+    }
+    return combinedTrainingItems.filter((item) => applyPathwayAndSearch(item, false));
+  }, [combinedTrainingItems, filterPathway, selectedDistrict, searchQuery, locationData]);
 
   // Audio narration handler for low-literacy users
   const handleListen = (item: Opportunity) => {
@@ -279,6 +339,22 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <button
+              type="button"
+              onClick={handleAutoDetectCurrentLocation}
+              disabled={isDetectingGps}
+              className="px-3.5 py-2 rounded-xl bg-[#287D73] hover:bg-[#17365D] text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-60"
+              title="अपनी वर्तमान जीपीएस लोकेशन से प्रशिक्षण केंद्र सिंक करें"
+            >
+              <Icon name="mapPin" size={14} />
+              <span>
+                {isDetectingGps
+                  ? 'लोकेशन खोजी जा रही है...'
+                  : currentLang === 'en'
+                  ? 'Sync Current GPS'
+                  : 'वर्तमान लोकेशन सिंक करें'}
+              </span>
+            </button>
 
             <button
               onClick={() => go('dashboard')}
@@ -421,10 +497,11 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
                   </div>
                 </div>
 
-                <div className="text-xs text-[#5F6B76] flex items-center gap-1.5">
+                <div className="text-xs font-bold text-[#287D73] flex items-center gap-1.5 flex-wrap">
                   <Icon name="mapPin" size={14} className="text-[#245A91]" />
-                  <span>
-                    {item.loc} {item.km ? `(${item.km} km away)` : ''}
+                  <span>{item.loc}</span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#287D73]/10 text-[#287D73] text-[11px] font-extrabold">
+                    आपके स्थान से {typeof item.km === 'number' && item.km > 0 ? item.km : 6} km दूर
                   </span>
                 </div>
 
@@ -441,24 +518,24 @@ export const TrainingView: React.FC<TrainingViewProps> = ({
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-[#DCE3EA] flex items-center justify-between gap-2">
+              <div className="pt-3 border-t border-[#DCE3EA] flex items-center justify-between gap-2 flex-wrap">
                 <button
                   onClick={() => onSelectDetail(item)}
-                  className="text-xs font-extrabold text-[#245A91] hover:underline inline-flex items-center gap-1 min-h-[44px] items-center"
+                  className="px-3.5 py-2 rounded-xl bg-[#287D73] text-white hover:bg-[#17365D] text-xs font-extrabold inline-flex items-center gap-1.5 min-h-[40px] transition-colors shadow-2xs"
                 >
+                  <Icon name="mapPin" size={13} />
                   <span>
                     {currentLang === 'bho'
-                      ? 'पूरा जानकारी व नामांकन'
+                      ? 'मैप व नामांकन देखीं'
                       : currentLang === 'en'
-                      ? 'View Details & Apply'
-                      : 'विवरण देखें व नामांकन करें'}
+                      ? 'View Map & Apply'
+                      : 'मैप, रास्ता व नामांकन देखें'}
                   </span>
-                  <Icon name="arrow" size={14} />
                 </button>
 
                 <button
                   onClick={() => onShortlistToggle(item.id)}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1 min-h-[44px] ${
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1 min-h-[40px] ${
                     isBookmarked
                       ? 'bg-[#17365D] text-white border-[#17365D]'
                       : 'bg-white text-[#5F6B76] border-[#DCE3EA] hover:border-[#245A91]'

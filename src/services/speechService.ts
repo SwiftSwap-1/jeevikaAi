@@ -26,7 +26,10 @@ class SpeechService {
   private isListening: boolean = false;
   private isSpeaking: boolean = false;
   private currentSpokenText: string = '';
+  private lastSpokenText: string = '';
+  private lastSpokenEndTime: number = 0;
   private speechTimeout: any = null;
+  private speakStartTimer: any = null;
   private activeSessionId: number = 0;
   private activeSpeakId: number = 0;
   private audioCtx: AudioContext | null = null;
@@ -43,12 +46,22 @@ class SpeechService {
       window.addEventListener('online', () => {
         this.isOfflineMode = false;
       });
+      // Pre-warm speechSynthesis voices list in browser
+      if ('speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.getVoices();
+          window.speechSynthesis.onvoiceschanged = () => {
+            window.speechSynthesis.getVoices();
+          };
+        } catch {
+          // Ignore
+        }
+      }
     }
   }
 
   /**
-   * Registers an interruption callback invoked immediately when the user speaks
-   * while AI audio is playing.
+   * Registers an interruption callback invoked when the user explicitly interrupts AI audio.
    */
   public setInterruptionHandler(handler: (() => void) | null): void {
     this.interruptionHandler = handler;
@@ -84,6 +97,46 @@ class SpeechService {
     }
 
     return wasSpeaking;
+  }
+
+  /**
+   * Checks if a recognized transcript is actually echo from the AI's own recent speech.
+   */
+  private isLikelyEchoOfAiSpeech(heardText: string): boolean {
+    if (this.isCurrentlySpeaking()) {
+      return true;
+    }
+
+    const normHeard = heardText.toLowerCase().replace(/[?,.!।\-"]/g, '').trim();
+    if (!normHeard) return true;
+
+    const elapsedSinceSpeechEnd = Date.now() - this.lastSpokenEndTime;
+    const referenceTexts: string[] = [];
+    if (this.currentSpokenText) referenceTexts.push(this.currentSpokenText);
+    if (this.lastSpokenText && elapsedSinceSpeechEnd < 2400) {
+      referenceTexts.push(this.lastSpokenText);
+    }
+
+    for (const ref of referenceTexts) {
+      const normRef = ref.toLowerCase().replace(/[?,.!।\-"]/g, '').trim();
+      if (!normRef) continue;
+      if (normHeard.length >= 2 && normRef.includes(normHeard)) {
+        return true;
+      }
+      const heardWords = normHeard.split(/\s+/).filter((w) => w.length >= 2);
+      if (heardWords.length >= 1) {
+        const refWords = new Set(normRef.split(/\s+/));
+        const matchCount = heardWords.filter((w) => refWords.has(w)).length;
+        if (elapsedSinceSpeechEnd < 900 && matchCount >= 1) {
+          return true;
+        }
+        if (heardWords.length >= 2 && matchCount / heardWords.length >= 0.65) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -132,7 +185,6 @@ class SpeechService {
           if (chunk1 === chunk2) {
             out.push(...arr.slice(i, i + n));
             i += n * 2;
-            // Skip any further immediate repetitions of the same chunk
             while (
               i + n <= arr.length &&
               arr.slice(i, i + n).map((x) => x.toLowerCase()).join(' ') === chunk1
@@ -251,24 +303,24 @@ class SpeechService {
       if (type === 'listen_start') {
         osc.frequency.setValueAtTime(440, now);
         osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
-        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        gain.gain.exponentialRampToValueAtTime(0.06, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.start(now);
-        osc.stop(now + 0.17);
+        osc.stop(now + 0.16);
       } else if (type === 'success') {
         osc.frequency.setValueAtTime(523.25, now);
         osc.frequency.setValueAtTime(659.25, now + 0.08);
-        gain.gain.exponentialRampToValueAtTime(0.07, now + 0.04);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.06, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
         osc.start(now);
-        osc.stop(now + 0.22);
+        osc.stop(now + 0.2);
       } else if (type === 'clarify') {
         osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(370, now + 0.15);
-        gain.gain.exponentialRampToValueAtTime(0.06, now + 0.04);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.frequency.exponentialRampToValueAtTime(370, now + 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.05, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
         osc.start(now);
-        osc.stop(now + 0.22);
+        osc.stop(now + 0.2);
       }
     } catch {
       // Non-blocking cue
@@ -276,25 +328,23 @@ class SpeechService {
   }
 
   /**
-   * Starts speech recognition.
-   * When `keepSpeaking` is true, allows background listening while TTS is speaking
-   * so the user can barge-in (interrupt) immediately by speaking!
+   * Starts speech recognition cleanly AFTER AI speech has stopped,
+   * preventing speaker feedback/self-transcription and browser audio channel conflicts.
    */
   public startListening(
     lang: SupportedLanguage,
     onResult: SpeechCallback,
     onError: SpeechErrorCallback,
     onEnd: SpeechEndCallback,
-    keepSpeaking: boolean = false
+    _keepSpeaking: boolean = false
   ) {
     if (!this.isSpeechRecognitionSupported()) {
-      onError('Voice capture is not supported in this browser. Please type your answer.', 'unsupported');
+      onError('इस ब्राउज़र में वॉइस सपोर्ट नहीं है। कृपया लिखकर जवाब दें।', 'unsupported');
       return;
     }
 
-    if (!keepSpeaking) {
-      this.interruptAndClearAudioBuffer(false);
-    }
+    // Ensure TTS is completely stopped before opening the microphone so the mic never hears the AI's own voice
+    this.stopSpeaking();
     this.stopListening();
 
     const sessionId = ++this.activeSessionId;
@@ -303,7 +353,7 @@ class SpeechService {
     try {
       this.recognition = new SpeechRec();
     } catch {
-      onError('Could not initialize speech recognition. Please type your answer.', 'init_fail');
+      onError('माइक शुरू नहीं हो सका। कृपया लिखकर जवाब दें।', 'init_fail');
       return;
     }
 
@@ -333,17 +383,8 @@ class SpeechService {
       if (sessionId !== this.activeSessionId) return;
       this.isListening = true;
       lastKnownTranscript = '';
-      if (!isMobile && !keepSpeaking) {
+      if (!isMobile) {
         this.playAudioCue('listen_start');
-      }
-    };
-
-    // Immediate voice activity detection: if user starts speaking while AI is outputting audio,
-    // trigger interruption handler to stop playback and clear buffer right away.
-    this.recognition.onspeechstart = () => {
-      if (sessionId !== this.activeSessionId) return;
-      if (this.isCurrentlySpeaking()) {
-        this.interruptAndClearAudioBuffer(true);
       }
     };
 
@@ -364,18 +405,9 @@ class SpeechService {
       const rawText = (finalTranscript || interimTranscript).trim();
       if (!rawText) return;
 
-      // Echo guard: if TTS is actively speaking and the recognized snippet is just part of the AI's own prompt, ignore it
-      if (this.isSpeaking && this.currentSpokenText) {
-        const normSpoken = this.currentSpokenText.toLowerCase().replace(/[?,.!।]/g, '');
-        const normHeard = rawText.toLowerCase().replace(/[?,.!।]/g, '').trim();
-        if (normHeard.length > 3 && normSpoken.includes(normHeard)) {
-          return;
-        }
-      }
-
-      // User barge-in interruption handler: immediately stop AI speech, flush audio buffer, and transition to listening!
-      if (this.isCurrentlySpeaking()) {
-        this.interruptAndClearAudioBuffer(true);
+      // Strict echo filter: never write the AI's own spoken prompt if room echo was picked up
+      if (this.isLikelyEchoOfAiSpeech(rawText)) {
+        return;
       }
 
       const dedupedText = this.deduplicateSpokenText(rawText, false);
@@ -394,14 +426,22 @@ class SpeechService {
       if (sessionId !== this.activeSessionId) return;
 
       const code = event && event.error;
-      let msg = 'Voice capture encountered an issue. You can continue typing instead.';
+      let msg = lang === 'en'
+        ? 'Voice capture encountered an issue. Please tap the mic again.'
+        : 'आवाज़ सुनने में समस्या आई। कृपया माइक दबाकर दोबारा बोलें।';
 
       if (code === 'not-allowed' || code === 'service-not-allowed') {
-        msg = 'Microphone access is blocked in this browser. Please allow microphone access or type your answers.';
+        msg = lang === 'en'
+          ? 'Microphone access is blocked. Please allow microphone permission.'
+          : 'माइक की अनुमति बंद है। कृपया ब्राउज़र में माइक की अनुमति दें।';
       } else if (code === 'no-speech') {
-        msg = 'No speech heard. Please tap the mic and speak aloud.';
+        msg = lang === 'en'
+          ? 'No speech heard. Please tap the mic and speak.'
+          : 'कोई आवाज़ नहीं सुनाई दी। कृपया माइक दबाकर बोलें।';
       } else if (code === 'audio-capture') {
-        msg = 'No microphone found on this device. Please use keyboard input.';
+        msg = lang === 'en'
+          ? 'No microphone found on this device.'
+          : 'इस डिवाइस पर माइक नहीं मिला।';
       } else if (code === 'network') {
         this.isOfflineMode = true;
         if (lastKnownTranscript) {
@@ -413,7 +453,7 @@ class SpeechService {
           }
         }
         msg = lang === 'en'
-          ? 'Network connection lost. Offline Voice Vocabulary Cache active.'
+          ? 'Network connection lost. Offline Voice Cache active.'
           : 'इंटरनेट कनेक्शन नहीं है। ऑफ़लाइन वॉइस कैश सक्रिय है।';
       }
 
@@ -426,16 +466,16 @@ class SpeechService {
     this.recognition.onend = () => {
       if (sessionId !== this.activeSessionId) return;
 
-      if (this.isListening) {
+      if (this.isListening && !this.isSpeaking) {
         setTimeout(() => {
-          if (sessionId === this.activeSessionId && this.isListening) {
+          if (sessionId === this.activeSessionId && this.isListening && !this.isSpeaking) {
             try {
               this.recognition.start();
             } catch {
               // Soft catch
             }
           }
-        }, 120);
+        }, 150);
         return;
       }
 
@@ -447,7 +487,7 @@ class SpeechService {
       this.recognition.start();
     } catch {
       this.isListening = false;
-      onError('Unable to open microphone. Please use text mode.', 'start_fail');
+      onError(lang === 'en' ? 'Unable to open microphone.' : 'माइक शुरू नहीं हो सका।', 'start_fail');
     }
   }
 
@@ -475,6 +515,8 @@ class SpeechService {
 
   /**
    * Speak aloud using browser Text-to-Speech (TTS).
+   * Stops active SpeechRecognition first so microphone never conflicts with or records TTS output,
+   * and waits 60ms after cancel() to avoid Chromium's synchronous cancel+speak bug.
    */
   public speak(text: string, lang: SupportedLanguage, onEnd?: () => void) {
     if (!this.isSpeechSynthesisSupported() || !text || !text.trim()) {
@@ -482,61 +524,127 @@ class SpeechService {
       return;
     }
 
+    // Stop listening while AI is speaking so mic does not record AI's own voice or abort TTS
+    this.stopListening();
     this.stopSpeaking();
+
     const speakId = ++this.activeSpeakId;
-    this.currentSpokenText = text;
+    const cleanText = text.replace(/\*\*/g, '').replace(/[#•]/g, '').trim();
+    this.currentSpokenText = cleanText;
+    this.isSpeaking = true;
 
-    try {
-      window.speechSynthesis.cancel();
-      if (this.speechTimeout) clearTimeout(this.speechTimeout);
+    this.speakStartTimer = setTimeout(() => {
+      if (speakId !== this.activeSpeakId) return;
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      this.activeUtterance = utterance;
-      utterance.lang = (lang === 'hi' || lang === 'bho' || lang === 'hin') ? 'hi-IN' : 'en-IN';
-      utterance.rate = 0.96;
-      utterance.pitch = 1.0;
+      try {
+        if (this.speechTimeout) clearTimeout(this.speechTimeout);
 
-      const voices = window.speechSynthesis.getVoices();
-      const targetPrefix = (lang === 'hi' || lang === 'bho') ? 'hi' : 'en';
-      const bestVoice = voices.find((v) => v.lang.toLowerCase().startsWith(targetPrefix)) || voices[0];
-      if (bestVoice) {
-        utterance.voice = bestVoice;
-      }
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        this.activeUtterance = utterance;
 
-      this.isSpeaking = true;
+        const isIndic = lang === 'hi' || lang === 'bho' || lang === 'hin';
+        utterance.lang = isIndic ? 'hi-IN' : 'en-IN';
+        utterance.rate = 0.96;
+        utterance.pitch = 1.0;
 
-      let hasFinished = false;
-      const finishExecution = () => {
-        if (hasFinished || speakId !== this.activeSpeakId) return;
-        hasFinished = true;
+        const voices = window.speechSynthesis.getVoices();
+        if (voices && voices.length > 0) {
+          if (isIndic) {
+            // Only assign a voice if an actual Hindi/Indian voice exists; never force an English-only voice on Devanagari text
+            const hindiVoice =
+              voices.find((v) => v.lang.toLowerCase().includes('hi-in') || v.lang.toLowerCase().startsWith('hi')) ||
+              voices.find((v) => v.name.toLowerCase().includes('hindi') || v.name.toLowerCase().includes('सहायक'));
+            if (hindiVoice) {
+              utterance.voice = hindiVoice;
+            }
+          } else {
+            const englishVoice =
+              voices.find((v) => v.lang.toLowerCase().includes('en-in')) ||
+              voices.find((v) => v.lang.toLowerCase().startsWith('en'));
+            if (englishVoice) {
+              utterance.voice = englishVoice;
+            }
+          }
+        }
+
+        const speakStartedAt = Date.now();
+        let hasFinished = false;
+
+        const finishExecution = () => {
+          if (hasFinished || speakId !== this.activeSpeakId) return;
+
+          // If the browser speech synthesis engine is still actively speaking, wait until it genuinely finishes
+          if (
+            typeof window !== 'undefined' &&
+            window.speechSynthesis?.speaking &&
+            Date.now() - speakStartedAt < 45000
+          ) {
+            this.speechTimeout = setTimeout(finishExecution, 250);
+            return;
+          }
+
+          hasFinished = true;
+          this.isSpeaking = false;
+          this.lastSpokenText = cleanText;
+          this.lastSpokenEndTime = Date.now();
+          this.currentSpokenText = '';
+          this.activeUtterance = null;
+          if (this.speechTimeout) {
+            clearTimeout(this.speechTimeout);
+            this.speechTimeout = null;
+          }
+          // Wait 450ms after hardware speech synthesis completely ends so speaker buffer & room echo dissipate before mic opens
+          this.speechTimeout = setTimeout(() => {
+            if (speakId === this.activeSpeakId && !this.isSpeaking && onEnd) {
+              onEnd();
+            }
+          }, 450);
+        };
+
+        utterance.onend = () => {
+          finishExecution();
+        };
+
+        utterance.onerror = (event: any) => {
+          const errType = event?.error || '';
+          // If speech was explicitly canceled/interrupted by stopSpeaking, do not trigger auto-listen onEnd
+          if (errType === 'canceled' || errType === 'interrupted') {
+            return;
+          }
+          const elapsed = Date.now() - speakStartedAt;
+          if (elapsed < 150) {
+            this.speechTimeout = setTimeout(finishExecution, 600);
+          } else {
+            finishExecution();
+          }
+        };
+
+        const estimatedDurationMs = Math.max(3000, cleanText.length * 105 + 2000);
+        this.speechTimeout = setTimeout(finishExecution, estimatedDurationMs);
+
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        window.speechSynthesis.speak(utterance);
+      } catch {
         this.isSpeaking = false;
         this.currentSpokenText = '';
         this.activeUtterance = null;
-        if (this.speechTimeout) clearTimeout(this.speechTimeout);
-        setTimeout(() => {
-          if (speakId === this.activeSpeakId && onEnd) {
-            onEnd();
-          }
-        }, 120);
-      };
-
-      utterance.onend = finishExecution;
-      utterance.onerror = finishExecution;
-
-      const estimatedDurationMs = Math.max(1800, text.length * 80 + 1200);
-      this.speechTimeout = setTimeout(finishExecution, estimatedDurationMs);
-
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      this.isSpeaking = false;
-      this.currentSpokenText = '';
-      this.activeUtterance = null;
-      if (speakId === this.activeSpeakId && onEnd) onEnd();
-    }
+        if (speakId === this.activeSpeakId && onEnd) onEnd();
+      }
+    }, 80);
   }
 
   public stopSpeaking() {
     this.activeSpeakId++;
+    if (this.speakStartTimer) {
+      clearTimeout(this.speakStartTimer);
+      this.speakStartTimer = null;
+    }
+    if (this.currentSpokenText) {
+      this.lastSpokenText = this.currentSpokenText;
+      this.lastSpokenEndTime = Date.now();
+    }
     this.currentSpokenText = '';
     if (this.activeUtterance) {
       try {
@@ -553,7 +661,6 @@ class SpeechService {
     }
     if (this.isSpeechSynthesisSupported()) {
       try {
-        window.speechSynthesis.pause();
         window.speechSynthesis.cancel();
       } catch {
         // Safe ignore
@@ -989,7 +1096,12 @@ class SpeechService {
     }
 
     // 7. Occupation or Location
-    const ack = lang === 'bho' ? 'बहुत बढ़िया, ई नोट हो गइल बा।' : 'बहुत बढ़िया, यह नोट कर लिया है।';
+    const ack =
+      lang === 'bho'
+        ? 'बहुत बढ़िया, ई नोट हो गइल बा।'
+        : lang === 'en'
+        ? 'Great, noted.'
+        : 'बहुत बढ़िया, यह नोट कर लिया है।';
     return {
       recognizedIntent: stepKey,
       cleanValue: raw,
@@ -1000,14 +1112,46 @@ class SpeechService {
   }
 
   /**
-   * Request verbal readback summary from backend
+   * Converts internal English choice keys (e.g. '10th pass (Secondary)', 'Job') into the user's selected language.
+   */
+  public localizeProfileValue(stepKey: string, val: string | undefined, lang: SupportedLanguage): string {
+    if (!val || !val.trim()) return '';
+    if (lang === 'en') return val;
+
+    if (stepKey === 'education') {
+      const found = EDU.find((e) => e.v.toLowerCase() === val.toLowerCase());
+      if (found) return lang === 'bho' ? found.bho || found.hi : found.hi;
+    }
+    if (stepKey === 'workType') {
+      const found = WORK.find((w) => w.v.toLowerCase() === val.toLowerCase());
+      if (found) return lang === 'bho' ? found.bho || found.hi : found.hi;
+    }
+    if (stepKey === 'mobility') {
+      const found = MOB.find((m) => m.v.toLowerCase() === val.toLowerCase());
+      if (found) return lang === 'bho' ? found.bho || found.hi : found.hi;
+    }
+    return val;
+  }
+
+  /**
+   * Request verbal readback summary from backend or generate clean localized summary
    */
   public async generateReadback(profile: BeneficiaryProfile, lang: SupportedLanguage): Promise<string> {
+    const eduLabel = this.localizeProfileValue('education', profile.education, lang) || (lang === 'en' ? 'Not specified' : 'उपलब्ध नहीं');
+    const workLabel = this.localizeProfileValue('workType', profile.workType || 'Job', lang);
+
     try {
       const response = await fetch('/api/generate-readback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, language: lang }),
+        body: JSON.stringify({
+          profile: {
+            ...profile,
+            education: eduLabel,
+            workType: workLabel,
+          },
+          language: lang,
+        }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -1020,12 +1164,12 @@ class SpeechService {
     }
 
     if (lang === 'bho') {
-      return `रउआ नाम ${profile.name || 'लाभार्थी'} बा। रउआ शिक्षा ${profile.education || 'उपलब्ध नहीं'}, हुनर ${profile.skills || 'उपलब्ध नहीं'}, पसंदीदा काम ${profile.interests || 'उपलब्ध नहीं'}, स्थान ${profile.location || 'उपलब्ध नहीं'} अउर कार्य प्राथमिकता ${profile.workType || 'Job'} बा। का ई सब जानकारी सही बा?`;
+      return `रउआ नाम ${profile.name || 'लाभार्थी'} बा। रउआ शिक्षा ${eduLabel}, हुनर ${profile.skills || 'उपलब्ध नहीं'}, पसंदीदा काम ${profile.interests || 'उपलब्ध नहीं'}, स्थान ${profile.location || 'उपलब्ध नहीं'} अउर कार्य प्राथमिकता ${workLabel} बा। का ई सब जानकारी सही बा?`;
     }
     if (lang === 'en') {
-      return `Your name is ${profile.name || 'Beneficiary'}. Education: ${profile.education || 'Not specified'}. Skills: ${profile.skills || 'Not specified'}. Interests: ${profile.interests || 'Not specified'}. Location: ${profile.location || 'Not specified'}. Work preference: ${profile.workType || 'Job'}. Is all this information correct?`;
+      return `Your name is ${profile.name || 'Beneficiary'}. Education: ${eduLabel}. Skills: ${profile.skills || 'Not specified'}. Interests: ${profile.interests || 'Not specified'}. Location: ${profile.location || 'Not specified'}. Work preference: ${workLabel}. Is all this information correct?`;
     }
-    return `आपका नाम ${profile.name || 'लाभार्थी'} है। आपकी शिक्षा ${profile.education || 'उपलब्ध नहीं'}, हुनर ${profile.skills || 'उपलब्ध नहीं'}, पसंदीदा काम ${profile.interests || 'उपलब्ध नहीं'}, स्थान ${profile.location || 'उपलब्ध नहीं'}, और कार्य प्रकार ${profile.workType || 'Job'} है। क्या यह सभी जानकारी सही है?`;
+    return `आपका नाम ${profile.name || 'लाभार्थी'} है। आपकी शिक्षा ${eduLabel}, हुनर ${profile.skills || 'उपलब्ध नहीं'}, पसंदीदा काम ${profile.interests || 'उपलब्ध नहीं'}, स्थान ${profile.location || 'उपलब्ध नहीं'}, और कार्य प्रकार ${workLabel} है। क्या यह सभी जानकारी सही है?`;
   }
 }
 
