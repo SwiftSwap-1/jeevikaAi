@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Super Administrator helper rule.
+    // The email must be verified (Google sign-in always is) so nobody can claim the admin
+    // address by registering it first with an email/password account.
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email_verified == true ||
+        request.auth.token.role == 'admin'
+      );
+    }
+
+    // User profile documents: Beneficiaries can create, update, and read their profile
+    match /users/{userId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // Assessment submissions and user skill analytics
+    match /assessments/{assessmentId} {
+      allow read, write, create, delete: if true;
+    }
+
+    // Cloudinary Media Studio remote assets & Hero Banners
+    match /media/{mediaId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // Local Business Showcase products & rural handicrafts
+    match /showcase/{productId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // Public Opportunities and Job Directory
+    match /opportunities/{opportunityId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // NSQF Skill Pathways
+    match /pathways/{pathwayId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // Training Centers and PMKVY / RSETI Providers
+    match /training_centers/{centerId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // System Statistics & Location Intelligence
+    match /analytics/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

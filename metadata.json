@@ -1,0 +1,8 @@
+{
+  "name": "JeevikaAI - Voice-First Livelihood & Skill Guidance",
+  "description": "Multilingual voice-first livelihood and NSQF-aligned skill roadmap platform designed for first-time digital users in Hindi, Bhojpuri, and English.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

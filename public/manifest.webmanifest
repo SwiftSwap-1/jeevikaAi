@@ -1,0 +1,34 @@
+{
+  "id": "/",
+  "name": "JeevikaAI - Livelihood & Skill Platform",
+  "short_name": "JeevikaAI",
+  "description": "Voice-first livelihood and NSQF-aligned skill guidance platform for first-time digital users in Hindi, Bhojpuri, and English.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FFFFFF",
+  "theme_color": "#17365D",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["education", "government", "productivity", "utilities"],
+  "lang": "hi-IN"
+}
